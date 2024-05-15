@@ -29,8 +29,8 @@ class ChannelData : public TObject
                  Long64_t ts, UShort_t tsGroup, Long64_t tsFull)
     {
       fModule = module;
-      fChannel = channel;;
-      fEnergy = energy;;
+      fChannel = channel;
+      fEnergy = energy;
       fTS = ts;
       fTSGroup = tsGroup;
       fTSFull = tsFull;

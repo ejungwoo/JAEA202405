@@ -6,23 +6,28 @@
 #include <iostream>
 using namespace std;
 
-void AnaCC::Run(int runNo, TString pathToInputFile)
+void AnaCC::RunConversion(int runNo, TString pathIn)
 {
   fRunNo = runNo; 
-  fPathToOutput = "/home/daquser/data/LiCD2Irrad/SortSi/test_data/";
-  if (pathToInputFile.IsNull()==false)
-    fPathToInput = pathToInputFile;
-  fPathToOutput = "/home/daquser/data/LiCD2Irrad/SortSi/out/";
-  fNumModules = 7;
-  fNumChannels = 16;
-  fChannelArray = NULL;
-  fCountChannels = 0;
+  fPathToInput = (pathIn.IsNull() ? TString("/home/daquser/data/LiCD2Irrad/SortSi/test_data/") : pathIn);
 
+  InitializeConversion();
   ConfigureDateTime();
   MakeOutputFile();
   ReadDataFile();
-  //FillHistogram();
-  //EndOfAnalysis();
+  EndOfConversion();
+}
+
+void AnaCC::InitializeConversion()
+{
+  fPathToOutput = "/home/daquser/data/LiCD2Irrad/SortSi/out/";
+  fNumModules = 7;
+  fNumChannels = 16;
+  fCountEvents = 0;
+  fChannelArray = NULL;
+  fCountChannels = 0;
+  fCountAllChannels = 0;
+  fCountTimeStampDecrease = 0;
 }
 
 void AnaCC::ConfigureDateTime()
@@ -34,12 +39,14 @@ void AnaCC::ConfigureDateTime()
   TList *listOfFiles = TSystemDirectory(fPathToInput,fPathToInput).GetListOfFiles();
   TIter next(listOfFiles);
   TSystemFile* fileObject;
-  int fDivisionMax = 0;
+  fDivisionMax = 10;
   while ((fileObject=(TSystemFile*)next()))
   {
     int idx = 0;
     if (fileObject->IsDirectory()) continue;
     TString fileName = fileObject -> GetName();
+    //cout << fileName.StartWith(Form("RUN%03d",fRunNo)) << " " << fileName.EndsWith(".dat") << endl;
+    if (fileName.Index(Form("RUN%03d",fRunNo))!=0) continue;
     if (fileName.EndsWith(".dat")==false) continue;
     fDateTime = fileName(7,12);
     int division = TString(fileName(25,3)).Atoi();
@@ -59,6 +66,7 @@ void AnaCC::MakeOutputFile()
   fTreeOut = new TTree("event","");
   fChannelArray = new TClonesArray("ChannelData",10);
   fTreeOut -> Branch("ch",&fChannelArray);
+  fTreeOut -> Branch("ts",&bTimeStampFull);
 }
 
 void AnaCC::ReadDataFile()
@@ -74,11 +82,9 @@ void AnaCC::ReadDataFile()
   char buffer[256];
   int countOpenFileTrials = 0;
 
-  //for (int i=0; i<fListOfInputFiles.size(); i++)
-  //{
-  //  TString fileNameInput = fListOfInputFiles.at(i);
-  //  cout << "Reading " << fileNameInput << endl;
-  //}
+  ChannelData* channelData = NULL;
+  fTimeStampPrev = -1;
+  fTimeStampSaved = -1;
 
   while(1)
   {
@@ -91,9 +97,9 @@ void AnaCC::ReadDataFile()
     cout << endl;
     cout << "== Reading " << fileNameInput << endl;
 
+    countOpenFileTrials = 0;
     while (1) // endless loop (2) to check the status of the Raw-Data file //
     {
-      countOpenFileTrials = 0;
       fileIn.open(fileNameInput);
       if (fileIn.fail())
       {
@@ -104,8 +110,8 @@ void AnaCC::ReadDataFile()
         }
         else{
           countOpenFileTrials++;
-          cout << "waiting(" << countOpenFileTrials << ") 10s ..." << endl;
-          sleep(10);
+          cout << "waiting(" << countOpenFileTrials << ") 5s ..." << endl;
+          sleep(5);
           continue;
         }
       }
@@ -124,8 +130,8 @@ void AnaCC::ReadDataFile()
         countOpenFileTrials++;
         fileIn.close();
         fileSizeOld = fileSize;
-        cout << "waiting(" << countOpenFileTrials << ") 10s ..." << endl;
-        sleep(10);
+        cout << "waiting(" << countOpenFileTrials << ") 5s ..." << endl;
+        sleep(5);
       }
       else if(fileSize > fileSizeOld){ // writing the file is still continued ...
         fileIn.close();
@@ -146,7 +152,7 @@ void AnaCC::ReadDataFile()
 
     fChannelArray -> Clear("C");
     fCountChannels = 0;
-    while (FileIn >> buffer)
+    while (fileIn >> buffer)
     {
       numData = (Int_t) sscanf(buffer, "%hu,%hu,%hu,%lld,%hu", &module, &channel, &energy, &timeStamp, &tsGroup);
       if (numData != 5) {
@@ -158,33 +164,50 @@ void AnaCC::ReadDataFile()
       if (tsGroup>0)
         timeStampFull += (Long64_t)(tsGroup) * 0xFFFFFFFFFF; 
 
-      if (timeStampFull<fTimeStampPrev)
+      //bTimeStampFull = timeStampFull;
+      cout << timeStampFull << endl;
+
+      if (timeStampFull<fTimeStampPrev) // time stamp decreased
       {
-        cout << "!!!!!!!! TIME STAMP DECREASED !!!!!!!!" << endl;
-        cout << "Exiting from current input file" << endl;
-        continue;
+        ++fCountTimeStampDecrease;
+        //cout << "TIME STAMP DECREASED!! " << fTimeStampPrev << " -> " << timeStampFull << ". Checking matching previous Time Stamps ..." << endl;
+        cout << "TIME STAMP DECREASED!! " << fTimeStampPrev << " -> " << timeStampFull << endl;
+        return;
       }
       else if (timeStampFull>fTimeStampPrev) // next event
       {
-        if (fCountEvents>0)
-          fTreeOut -> Fill();
+        if (timeStampFull<=fTimeStampSaved)
+        {
+          // find channelArray from previous entries.
+          // create new entries if not found.
+        }
+        else
+        {
+            fTreeOut -> Fill();
+        }
         fChannelArray -> Clear("C");
         fCountChannels = 0;
         fTimeStampPrev = timeStampFull;
+        channelData = (ChannelData*) fChannelArray -> ConstructedAt(fCountChannels);
         fCountEvents++;
       }
 
-      ChannelData* data = (ChannelData*) fChannelArray -> ConstructedAt(fCountChannels);
-      data -> SetData(module,channel,energy,timeStamp,tsGroup,timeStampFull);
-      ++fCountChannels;
+      channelData -> SetData(module,channel,energy,timeStamp,tsGroup,timeStampFull);
+      fCountChannels++;
+      fCountAllChannels++;
     }
   }
 }
 
-void AnaCC::FillHistogram()
+void AnaCC::EndOfConversion()
 {
-}
+  fFileOut -> cd();
+  fTreeOut -> Write();
 
-void AnaCC::EndOfAnalysis()
-{
+  cout << endl;
+  cout << "== End of conversion!" << endl;
+  cout << "== Number of events: " << fCountEvents << endl;
+  cout << "== Number of all channels: " << fCountAllChannels << endl;
+  cout << "== Number of times TimeStamp decreased: " << fCountTimeStampDecrease << endl;
+  cout << "== Output file name: " << fFileNameOut << endl;
 }

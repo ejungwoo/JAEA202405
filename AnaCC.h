@@ -14,19 +14,21 @@ class AnaCC
     AnaCC() {}
     ~AnaCC() {}
 
-    void Run(int runNo, TString pathToInputFile);
+    void RunConversion(int runNo, TString pathToInputFile);
 
+    void InitializeConversion();
     void ConfigureDateTime();
     void MakeOutputFile();
     void ReadDataFile();
-    void FillHistogram();
-    void EndOfAnalysis();
+    void EndOfConversion();
+
+    void Draw() {}
+    void FillHistogram() {}
 
   private:
-    int fRunNo = -1;
-    // somehow below initialization do not work
-    TString fPathToInput = "/home/daquser/data/LiCD2Irrad/SortSi/test_data/";
-    TString fPathToOutput = "/home/daquser/data/LiCD2Irrad/SortSi/out/";
+    int fRunNo;
+    TString fPathToInput;
+    TString fPathToOutput;
     TString fDateTime;
     TString fDivisionMax;
     vector<TString> fListOfInputFiles;
@@ -37,11 +39,15 @@ class AnaCC
     TTree* fTreeOut;
 
     Long64_t fTimeStampPrev;
+    Long64_t fTimeStampSaved;
     int fNumModules;
     int fNumChannels;
 
     TClonesArray *fChannelArray;
-    Int_t fCountChannels = 0;
+    Long64_t bTimeStampFull;
+    Int_t fCountChannels;
+    Int_t fCountAllChannels;
+    Int_t fCountTimeStampDecrease;
 };
 
 #endif
