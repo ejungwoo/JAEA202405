@@ -1,0 +1,55 @@
+#Definition of histgram name for each Mod and Ch
+#Mod  Ch   Name    Title
+ 0     0   Ea01    Pulse Height of Total-Ea-01
+ 0     1   Ea02    Pulse Height of Total-Ea-02
+ 0     2   Ea03     Pulse Height of Total-Ea-03
+ 0     3   Ea04    Pulse Height of Total-Ea-04
+ 0     4   Ea05    Pulse Height of Total-Ea-05
+ 0     5   Ea06    Pulse Height of Total-Ea-06
+ 0     6   Ea07    Pulse Height of Total-Ea-07
+ 0     7   Ea08    Pulse Height of Total-Ea-08
+ 0     8   Ea09    Pulse Height of Total-Ea-09
+ 0     9   Ea10    Pulse Height of Total-Ea-10
+ 0    10   Ea11    Pulse Height of Total-Ea-11
+ 0    11   Ea12    Pulse Height of Total-Ea-12
+ 0    12   Ea13    Pulse Height of Total-Ea-13
+ 0    13   Ea14    Pulse Height of Total-Ea-14
+ 0    14   Ea15    Pulse Height of Total-Ea-15
+ 0    15   Ea16    Pulse Height of Total-Ea-16
+ 1     0   Eb01    Pulse Height of Total-Eb-01
+ 1     1   Eb02    Pulse Height of Total-Eb-02
+ 1     2   Eb03    Pulse Height of Total-Eb-03
+ 1     3   Eb04    Pulse Height of Total-Eb-04
+ 1     4   Eb05    Pulse Height of Total-Eb-05
+ 1     5   Eb06    Pulse Height of Total-Eb-06
+ 1     6   Eb07    Pulse Height of Total-Eb-07
+ 1     7   Eb08    Pulse Height of Total-Eb-08
+ 1     8   Eb09    Pulse Height of Total-Eb-09
+ 1     9   Eb10    Pulse Height of Total-Eb-10
+ 1    10   Eb11    Pulse Height of Total-Eb-11
+ 1    11   Eb12    Pulse Height of Total-Eb-12
+ 1    12   Eb13    Pulse Height of Total-Eb-13
+ 1    13   Eb14    Pulse Height of Total-Eb-14
+ 1    14   Eb15    Pulse Height of Total-Eb-15
+ 1    15   Eb16    Pulse Height of Total-Eb-16
+ 2     0   DE01    Pulse Height of #Delta E-01
+ 2     1   DE02    Pulse Height of #Delta E-02
+ 2     2   DE03    Pulse Height of #Delta E-03
+ 2     3   DE04    Pulse Height of #Delta E-04
+ 4    12   FC	   FC
+13     8   Ge1  Ge1
+13     9   Ge2  Ge2
+13    10   Ge3  Ge3
+13    11   Ge4  Ge4
+13    12   LaBr1   LaBr1
+13    13   LaBr2   LaBr2
+13    14   LaBr3   LaBr3
+13    15   LaBr4   LaBr4
+15     8   TDCGe1	   TDCGe1
+15     9   TDCGe2	   TDCGe2
+15    10   TDCGe3	   TDCGe3
+15    11   TDCGe4	   TDCGe4
+15    12   TDCLaBr1   TDCLaBr1
+15    13   TDCLaBr2   TDCLaBr2
+15    14   TDCLaBr3   TDCLaBr3
+15    15   TDCLaBr4   TDCLaBr4
