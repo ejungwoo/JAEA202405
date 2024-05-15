@@ -1,6 +1,36 @@
 #ifndef LICD2IRRAD_SORTSI_H
 #define LICD2IRRAD_SORTSI_H
 
+/*************************************************************
+ * macro: SortSi02.C                                         *
+ * written by H. Makii                                       *
+ * Time-stamp: <2018-02-28 14:22:49 makii>                   *
+ * check Time Stamps,  make histograms,                      *
+ * search peak for Si detectors,                             *
+ *  - single histograms for Si detectors                     *
+ *  - (E-DE)-DE histograms                                   *
+ * check gain stability for Si detectors as a function of Ts *
+ *                                                           *
+ * make TTree containing data for DE, E, and MWPC(Q,X,Y,dT), *
+ *                        and Neutron Detectors (PH,PSD,TOF) *
+ * Trigger : Si Deleta-E                                     *
+ *                                                           *
+ * Usage:                                                    *
+ * SortSi02("RUN035",       RunName No.                      *
+ *          "201503061604", Date and Time                    *
+ *          -1)             Last File No.                    *
+ *                                                           *
+ * Raw-Data files : PathIn/RUN035_201503061604_list_???.dat  *
+ *  if LastFile < 0, open all existing files,                *
+ *   open 000 - (Last File) otherwise                        *
+ *                                                           *
+ * output files   : PathOut/RUN035.log                       *
+ *                          RUN035_hist.root                 *
+ *                          RUN035_tree.root                 *
+ *                                                           *
+ * This macro was tested by using ROOT 5.34/36               *
+ *************************************************************/
+
 /********************************************
  * Header file for SortSi                   *
  ********************************************/
@@ -33,11 +63,46 @@ using namespace std;
 #pragma link C++ class vector<unsigned short>+;
 #endif
 
+/********************************************
+ * JW                                       *
+ ********************************************/
+#include "TSystemDirectory.h"
+#include "TList.h"
+#define eout cout<<"+\033[0;36m"<<__LINE__<<"\033[0m "
+
+////////////////////////////
+void SortSi(int RunNumber=42);
+void SortSi(TString RunName, TString DateTime, Int_t FLast);
+void InitUseDE(void);
+void PrintErrors(Bool_t fWrite, std::ofstream & fout, Long64_t **err, Long64_t **event, Long64_t **err2);
+void PeakPosition2(Bool_t fPID, TH2 *hin, TH2 *hout, Double_t &PeakEE, Double_t &PeakDE);
+void InitChMWPC(void);
+void InitUseDE(void);
+void PrintEventTree(std::ofstream & fout, Long64_t eventTrig, Long64_t eventStored, Long64_t **eventTree, Long64_t **event);
+
+////////////////////////////
+void ConfigureDateTime(TString RunName, TString &DateTime, Int_t &FLast);
+void MakeHistograms();
+void MakeOutputFile();
+void Initialize();
+void ReadDataFile();
+void FillHistogram();
+void EndOfAnalysis();
+
+////////////////////////////
+TString RunName;
+TString DateTime;
+Int_t FLast;
+Color_t lcolor[] = {kBlack,  kGray,  kRed, kGreen,   kYellow,kBlue,kMagenta,kOrange, kGreen+3,kCyan+2,kCyan,kYellow+2,kRed+2, kSpring,kAzure,kTeal};
+
+/********************************************
+ * JW                                       *
+ ********************************************/
 
 ////////////////////////////
 // Path for Raw-Data file //
 ////////////////////////////
-const TString PathIn = "/home/daquser/data/LiCD2Irrad";
+const TString PathIn = "/home/daquser/data/LiCD2Irrad/SortSi/test_data/";
 //////////////////////////////////
 // Number Of Modules Used (<20) //
 //////////////////////////////////
@@ -75,6 +140,7 @@ ifstream      DefFile;
 TH1D       ***Hist;
 TString       HNameBuf, HTitlBuf;
 TFile        *FHist;
+TString       HistFileName;
 string        BufTmp;
 TDirectory  **CdMod;
 TString     **HName;

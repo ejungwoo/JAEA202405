@@ -1,48 +1,93 @@
-/*************************************************************
- * macro: SortSi.C                                           *
- * written by Jung Woo Lee                                   *
- * modified from below information                           *
- *************************************************************/
-
-/*************************************************************
- * macro: SortSi02.C                                         *
- * written by H. Makii                                       *
- * Time-stamp: <2018-02-28 14:22:49 makii>                   *
- * check Time Stamps,  make histograms,                      *
- * search peak for Si detectors,                             *
- *  - single histograms for Si detectors                     *
- *  - (E-DE)-DE histograms                                   *
- * check gain stability for Si detectors as a function of Ts *
- *                                                           *
- * make TTree containing data for DE, E, and MWPC(Q,X,Y,dT), *
- *                        and Neutron Detectors (PH,PSD,TOF) *
- * Trigger : Si Deleta-E                                     *
- *                                                           *
- * Usage:                                                    *
- * SortSi02("RUN035",       RunName No.                      *
- *          "201503061604", Date and Time                    *
- *          -1)             Last File No.                    *
- *                                                           *
- * Raw-Data files : PathIn/RUN035_201503061604_list_???.dat  *
- *  if LastFile < 0, open all existing files,                *
- *   open 000 - (Last File) otherwise                        *
- *                                                           *
- * output files   : PathOut/RUN035.log                       *
- *                          RUN035_hist.root                 *
- *                          RUN035_tree.root                 *
- *                                                           *
- * This macro was tested by using ROOT 5.34/36               *
- *************************************************************/
-
-//#define eout cout<<"+\033[0;36m"<<__LINE__<<"\033[0m "
-#define eout cout
+/* macro: SortSi.C written by jungwoo (2024-05-14) 
+ * modified from SortSi02.C by makii */
 
 #include "SortSi.h"
-#include "TSystemDirectory.h"
-#include "TSystemDirectory.h"
 
-void SortSi(int RunNumber=41);
-void SortSi(TString RunName, TString DateTime, Int_t FLast);
+void SortSi(int RunNumber)
+{
+  SortSi(TString(Form("RUN%03d",RunNumber)),"",-1);
+}
+
+void SortSi(TString RunName0, TString DateTime0, Int_t FLast0)
+{
+  RunName = RunName0;
+  DateTime = DateTime0;
+  FLast = FLast0;
+  if (DateTime.IsNull())
+    ConfigureDateTime(RunName,DateTime,FLast);
+    eout << "DateTime = " << DateTime << endl;
+    eout << "FLast    = " << FLast << endl;
+
+  ////////////////
+  // Start time //
+  ////////////////
+  timer.Start();
+  //////////////
+  // Log file //
+  //////////////
+  FLog.open( Form("%s/%s.log",PathOut.Data(), RunName.Data() ) );
+  eout << Form("Logger name : %s/%s.log",PathOut.Data(), RunName.Data() )  << endl;
+  if( FLog.fail() ){
+    cout << TString::Format(" Can't open output file: %s/%s.log \n\n",PathOut.Data(),RunName.Data() );
+    FLog.close();
+    exit(1);
+  }
+  FLog << TString::Format(" SortSi(%s, %s, %d)\n",RunName.Data(), DateTime.Data(), FLast ) << endl;
+  ///////////////////////////////////////////////////////////
+  // Definition of Mod and Ch -> name & title of histogram //
+  ///////////////////////////////////////////////////////////
+  DefFile.open( DefFileName.Data() );
+  eout << "Mod->Ch map : " << DefFileName.Data() << endl;
+  if( DefFile.fail() ){
+    cout << TString::Format(" Can't open iput file: %s \n\n", DefFileName.Data() );
+    FLog.close();
+    DefFile.close();
+    exit(1);
+  }
+  FLog << TString::Format("  Mod and Ch definition file: %s", DefFileName.Data() ) << endl;
+  HName = new TString*[NMod];
+  HTitl = new TString*[NMod];
+  for(Int_t l=0; l<NMod; l++){
+    HName[l] = new TString[16];
+    HTitl[l] = new TString[16];
+    for(Int_t m=0; m<16; m++){
+      HName[l][m] = "";
+      HTitl[l][m] = "";
+    }
+  }
+  getline(DefFile, BufTmp);// skip header
+  getline(DefFile, BufTmp);// 
+  FLog << "   Mod\tCh\tName\tTitle" << endl;
+  while(DefFile >> Mod >> Ch >> HNameBuf){
+    // BufTmp (= Title of Histogram) contains space...
+    getline(DefFile,BufTmp);
+    // Erase (space or tab) in begining of BufTmp
+    size_t pos;
+    while( (pos = BufTmp.find_first_of(" 　\t") ) == 0){
+      BufTmp.erase(BufTmp.begin() );
+      if(BufTmp.empty() ) break;
+    }
+    HName[Mod][Ch] = HNameBuf;
+    HTitl[Mod][Ch] = BufTmp;
+    FLog << TString::Format("   %02d\t%02d\t%s\t%s",Mod,Ch,
+        HName[Mod][Ch].Data(),HTitl[Mod][Ch].Data()) << endl;
+  }
+  FLog << endl;
+  DefFile.close();
+
+  MakeHistograms();
+  MakeOutputFile();
+  Initialize();
+  ReadDataFile();
+  FillHistogram();
+  EndOfAnalysis();
+
+  eout << Form("Logger name : %s/%s.log",PathOut.Data(), RunName.Data() )  << endl;
+  eout << "Mod->Ch map : " << DefFileName.Data() << endl;
+  eout << "Histogram file name : " << HistFileName << endl;
+
+  exit(0);
+}
 
 /////////////////////////////////////////////////////////////
 // Specify which E (Ea or Eb) should coincide with Delta-E //
@@ -308,9 +353,7 @@ void PrintEventTree(std::ofstream & fout,
 
 void ConfigureDateTime(TString RunName, TString &DateTime, Int_t &FLast)
 {
-  eout << endl;
-  TList *listOfFiles = TSystemDirectory("test_data","test_data").GetListOfFiles();
-  /*
+  TList *listOfFiles = TSystemDirectory(PathIn,PathIn).GetListOfFiles();
   TIter next(listOfFiles);
   TSystemFile* fileObject;
   int divisionMax = 0;
@@ -323,89 +366,20 @@ void ConfigureDateTime(TString RunName, TString &DateTime, Int_t &FLast)
     int division = TString(fileName(25,3)).Atoi();
     if (division>divisionMax)
       divisionMax = division;
-    cout << "Found file " << fileName << " : " <<  DateTime << " / " << division << endl;
+    eout << fileName << " : " <<  DateTime << " / " << division << endl;
   }
-  cout << divisionMax << endl;
   FLast = divisionMax;
-  */
 }
 
-void SortSi(int RunNumber)
+void MakeHistograms()
 {
-  SortSi(TString(Form("RUN%03d",RunNumber)),"",-1);
-}
-
-void SortSi(TString RunName, TString DateTime, Int_t FLast)
-{
-  /*
-  if (DateTime.IsNull())
-    ConfigureDateTime(RunName,DateTime,FLast);
-    eout << DateTime << endl;
-    eout << FLast << endl;
-  return;
-
-  ////////////////
-  // Start time //
-  ////////////////
-  timer.Start();
-  //////////////
-  // Log file //
-  //////////////
-  FLog.open( Form("%s/%s.log",PathOut.Data(), RunName.Data() ) );
-  eout << Form("Logger name is %s/%s.log",PathOut.Data(), RunName.Data() )  << endl;
-  if( FLog.fail() ){
-    cout << TString::Format(" Can't open output file: %s/%s.log \n\n",PathOut.Data(),RunName.Data() );
-    FLog.close();
-    exit(1);
-  }
-  FLog << TString::Format(" SortSi(%s, %s, %d)\n",RunName.Data(), DateTime.Data(), FLast ) << endl;
-  ///////////////////////////////////////////////////////////
-  // Definition of Mod and Ch -> name & title of histogram //
-  ///////////////////////////////////////////////////////////
-  DefFile.open( DefFileName.Data() );
-  eout << "Mod -> Ch map is " << DefFileName.Data() << endl;
-  if( DefFile.fail() ){
-    cout << TString::Format(" Can't open iput file: %s \n\n", DefFileName.Data() );
-    FLog.close();
-    DefFile.close();
-    exit(1);
-  }
-  FLog << TString::Format("  Mod and Ch definition file: %s", DefFileName.Data() ) << endl;
-  HName = new TString*[NMod];
-  HTitl = new TString*[NMod];
-  for(Int_t l=0; l<NMod; l++){
-    HName[l] = new TString[16];
-    HTitl[l] = new TString[16];
-    for(Int_t m=0; m<16; m++){
-      HName[l][m] = "";
-      HTitl[l][m] = "";
-    }
-  }
-  getline(DefFile, BufTmp);// skip header
-  getline(DefFile, BufTmp);// 
-  FLog << "   Mod\tCh\tName\tTitle" << endl;
-  while(DefFile >> Mod >> Ch >> HNameBuf){
-    // BufTmp (= Title of Histogram) contains space...
-    getline(DefFile,BufTmp);
-    // Erase (space or tab) in begining of BufTmp
-    size_t pos;
-    while( (pos = BufTmp.find_first_of(" 　\t") ) == 0){
-      BufTmp.erase(BufTmp.begin() );
-      if(BufTmp.empty() ) break;
-    }
-    HName[Mod][Ch] = HNameBuf;
-    HTitl[Mod][Ch] = BufTmp;
-    FLog << TString::Format("   %02d\t%02d\t%s\t%s",Mod,Ch,
-        HName[Mod][Ch].Data(),HTitl[Mod][Ch].Data()) << endl;
-  }
-  FLog << endl;
-  DefFile.close();
-
   ///////////////////////////////////////////////////////////////////////////////////////
   // Create and open output file, make directory in output file, and define histograms //
   ///////////////////////////////////////////////////////////////////////////////////////
-  FHist = new TFile( Form("%s/%s_hist.root",PathOut.Data(), RunName.Data() ), "RECREATE");
-  eout << "Histogram file name is " << FHist->GetName() << endl;
+  HistFileName = Form("%s/%s_hist.root",PathOut.Data(), RunName.Data() );
+  FHist = new TFile( HistFileName, "RECREATE");
+  eout << "Creating Histograms" << endl;
+  eout << "Histogram file name : " << HistFileName << endl;
   CdMod = new TDirectory*[NMod];
   Hist  = new TH1D**[NMod];
   HistTimeElapsed= new TH1D**[NMod];
@@ -424,7 +398,6 @@ void SortSi(TString RunName, TString DateTime, Int_t FLast)
       }
     }
   }
-  return;
 
   // Histograms for Ts Difference
   CdTDiff = FHist->mkdir( NameCdTDiff.Data() );
@@ -625,7 +598,10 @@ void SortSi(TString RunName, TString DateTime, Int_t FLast)
   HistCrMCP[3]->GetXaxis()->SetTimeDisplay(1);
   HistCrMCP[3]->GetXaxis()->SetTimeFormat( TimeFormat.Data() );
   HistCrMCP[3]->GetXaxis()->SetLabelOffset(0.025);
+}
 
+void MakeOutputFile()
+{
   ///////////////////////////////////////////
   // Create and open output file for TTree //
   ///////////////////////////////////////////
@@ -655,18 +631,22 @@ void SortSi(TString RunName, TString DateTime, Int_t FLast)
   OutTree->Branch("PsdNdL", PsdNdL, "PsdNdL[17]/s");
   OutTree->Branch("TofNdR", TofNdR, "TofNdR[17]/s");
   OutTree->Branch("TofNdL", TofNdL, "TofNdL[17]/s");
+}
+
+void Initialize()
+{
   ////////////
   // Canvas //
   ////////////
   HNameBuf = Form("SortSi [%s]",RunName.Data() );
+  eout << "Creating canvas for buffer" << endl;
   Canvas = new TCanvas("Canvas",HNameBuf.Data(),1400,1000);
   Canvas->Divide(2,1);//   0      1     2       3       4     5        6       7
-  Color_t lcolor[] = {kBlack,  kGray,  kRed, kGreen,   kYellow,kBlue,kMagenta,kOrange,
-    kGreen+3,kCyan+2,kCyan,kYellow+2,kRed+2, kSpring,kAzure,kTeal};
   Canvas->cd(1);
   gPad  ->Divide(1,2);
   Canvas->cd(2);
   gPad  ->Divide(1,4);
+
   //////////////////////
   // Number of Events //
   //////////////////////
@@ -700,11 +680,16 @@ void SortSi(TString RunName, TString DateTime, Int_t FLast)
   }
   EventTrig   = 0;
   EventStored = 0;
+
   //////////////////////////////////////////////////////////
   // Initialize vector for Last Time Stamp of each Module //
   //////////////////////////////////////////////////////////
   for(Int_t l=0; l<NMod; l++)
     TsLastMod.push_back(0xFFFFFFFFFFFF); // 48bit (max. of Time Stamp: 40bit)
+}
+
+void ReadDataFile()
+{
   /////////////////////////////////////////////////////////////////////
   // endless loop (1) to read of Raw-Data files written in given RunName //
   /////////////////////////////////////////////////////////////////////
@@ -718,6 +703,7 @@ void SortSi(TString RunName, TString DateTime, Int_t FLast)
     /////////////////////////////////
     FileInName = TString::Format("%s/%s_%s_list_%03d.dat",
         PathIn.Data(),RunName.Data(),DateTime.Data(),FNum);
+    eout << "Reading " << FileInName << endl;
     /////////////////////////////////////////////////////
     // Open Input Raw-Data File & check the size of it //
     /////////////////////////////////////////////////////
@@ -1698,6 +1684,10 @@ void SortSi(TString RunName, TString DateTime, Int_t FLast)
     ////////////////
     if(SSize <= SSizeMax) {cout << " SSize <= SSizeMax" << endl; break;}
   } // end of endless loop(1)
+}
+
+void FillHistogram()
+{
   /////////////////////////////////////////////////////
   // Fill the last event for each Mod&Ch to multimap //
   /////////////////////////////////////////////////////
@@ -1953,6 +1943,10 @@ void SortSi(TString RunName, TString DateTime, Int_t FLast)
     // next Trigger
     ++itrTrig;
   }
+}
+
+void EndOfAnalysis()
+{
   if( !(DmapA.empty() ) ) DmapA.clear();
   if( !(DmapT.empty() ) ) DmapT.clear();
   ////////////////////////////////////////
@@ -2132,6 +2126,4 @@ void SortSi(TString RunName, TString DateTime, Int_t FLast)
   delete [] DA;
   delete [] WF;
   //
-  exit(0);
-  */
 }
