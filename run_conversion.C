@@ -1,9 +1,9 @@
-//#include "LoadLibrary.h"
-
-void run_conversion(int runNumber=42, bool updateSource=true)
+void run_conversion(int runNumber)
 {
-  //if (LoadLibrary(updateSource)==false) return;
+  auto ana = new Analysis();
+  ana -> SetReturnIfNoFile(true); // If true, Do not wait for data file to apear
+  ana -> SetIgnoreFileUpdate(false); // If true, do not wait for data file to finish
 
-  auto ana = new AnaCC();
-  ana -> RunConversion(42,"/home/daquser/data/LiCD2Irrad/SortSi/test_data/");
+  ana -> RunConversion(runNumber,"/home/daquser/data/LiCD2Irrad/");
+  //ana -> RunConversionOnline(3,"/home/daquser/data/LiCD2Irrad/");
 }

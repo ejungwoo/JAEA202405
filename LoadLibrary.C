@@ -12,12 +12,12 @@ bool LoadLibrary(bool updateSource=true)
       cout << "Failed to load library for ChannelData!" << endl;
       return false;
     }
-    if (gSystem -> CompileMacro("AnaCC.cpp","k-","","build")==false) {
-      cout << "Failed to create library for AnaCC!" << endl;
+    if (gSystem -> CompileMacro("Analysis.cpp","k-","","build")==false) {
+      cout << "Failed to create library for Analysis!" << endl;
       return false;
     }
-    if (gSystem -> Load("/home/daquser/data/LiCD2Irrad/SortSi/build/AnaCC_cpp.so")<0) {
-      cout << "Failed to load library for AnaCC!" << endl;
+    if (gSystem -> Load("/home/daquser/data/LiCD2Irrad/SortSi/build/Analysis_cpp.so")<0) {
+      cout << "Failed to load library for Analysis!" << endl;
       return false;
     }
   }
@@ -26,11 +26,13 @@ bool LoadLibrary(bool updateSource=true)
       cout << "Failed to load library for ChannelData!" << endl;
       return false;
     }
-    if (gSystem -> Load("/home/daquser/data/LiCD2Irrad/SortSi/build/AnaCC_cpp.so")<0) {
-      cout << "Failed to load library for AnaCC!" << endl;
+    if (gSystem -> Load("/home/daquser/data/LiCD2Irrad/SortSi/build/Analysis_cpp.so")<0) {
+      cout << "Failed to load library for Analysis!" << endl;
       return false;
     }
   }
+
+  //gSystem -> Load("run_conversion.C");
 
   return true;
 }
