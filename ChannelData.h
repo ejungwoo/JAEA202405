@@ -1,7 +1,7 @@
 #ifndef CHANNELDATA_CRPTCR_CD2_HH
 #define CHANNELDATA_CRPTCR_CD2_HH
 
-//#define WRITE_ALL_DATA
+#define WRITE_ALL_DATA
 
 #include "TObject.h"
 
