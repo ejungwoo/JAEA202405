@@ -47,7 +47,7 @@ class Analysis
     int  GetRealModule(int fake); ///< Get real module number from fake module index
     int  GetGlobalID(UShort_t module, UShort_t channel);
     void GetModCh(int globalID, UShort_t &module, UShort_t &channel);
-    int  GetDetectorType(int module, int channelID=0);
+    double GetCalibratedEnergy(int module, int channelID, int adc);
 
   // conversion
   public:
@@ -65,7 +65,7 @@ class Analysis
     void SetAutoUpdateDrawing(bool value) { fAutoUpdateDrawing = value; }
     void SetShowEnergyConversion(bool value) { fShowEnergyConversion = value; }
     void SetCoincidenceTSRange(int value) { fCoincidenceTSRange = value; }
-    void SetCoincidenceMult(int value) { fCoincidenceMult = value; }
+    void SetCoincidenceMult(int value) { fCoincidenceMultCut = value; }
 
   // alpha energy calibration
   public:
@@ -80,11 +80,12 @@ class Analysis
     void ReadDataFile();
     bool FillDataTree();
     void EndOfConversion();
+    void PrintConversionSummary();
 
     void WriteRunParameters(TFile* file, int option);
     void UpdateCvsOnline(bool firstDraw=false);
-    void SetAttribute(TH1* hist, TVirtualPad* pad, int npad=1, bool td=false);
-    void SetAttribute(TH1* hist, int npad=1, bool td=false) { SetAttribute(hist, (TVirtualPad*)nullptr, npad, td); }
+    void SetAttribute(TH1* hist, TVirtualPad* pad, int npad=1, bool is2D=false);
+    void SetAttribute(TH1* hist, int npad=1, bool is2D=false) { SetAttribute(hist, (TVirtualPad*)nullptr, npad, is2D); }
 
     void InitializeMapping();
     void InitializeDrawing();
@@ -124,10 +125,14 @@ class Analysis
     bool fIgnoreFileUpdate = false;
     Long64_t fTimeStampPrevTrue = -1; ///< decreased point of time stamp
     Long64_t fTimeStampPrev = -1; ///< previous time stamp
+
+    UShort_t fADCThreshold = 0;
+
     Long64_t bTimeStamp = -1; ///< branch value for time stamp
     Long64_t bTimeStampDist = -1; ///< branch value for distance do previous time stamp
     UShort_t bNumChannels = 0;
-    UShort_t fADCThreshold = 0;
+    Double_t bdE = 0;
+    Double_t bdES1 = 0;
 
     const int fNumModules = _NUMBER_OF_MODULES_;
     const int fNumChannels = _NUMBER_OF_CHANNELS_;
@@ -135,7 +140,7 @@ class Analysis
     TClonesArray *fChannelArray = nullptr;
     Int_t fCoincidenceCount[5];
     Int_t fCoincidenceTSRange = 0;
-    Int_t fCoincidenceMult = -1;
+    Int_t fCoincidenceMultCut = -1;
     Int_t fCountChannels = 0;
     Int_t fCountAllChannels = 0;
     Int_t fCountTSError = 0;
@@ -143,6 +148,11 @@ class Analysis
     bool fStopAtTSError = false;
     bool fExitAnalysis = false;
     bool fExitRoot = false;
+
+    vector<int> fdEArrayIdx;
+    vector<int> fS1ArrayIdx;
+    double fdEADC = 0;
+    double fS1ADC = 0;
 
     bool fEnergyConversionSet = false;
     TF1* fFxEnergyConversion[_NUMBER_OF_CHANNELS_][_NUMBER_OF_CHANNELS_];
@@ -189,6 +199,7 @@ class Analysis
     int **fMapDetectorType;
     int **fMapDetectorChannel;
     bool **fMapDetectorReplaced;
+    int **fMapDetectorGroup;
     int **fMapDetectorRFMod;
     int **fMapDetectorRFMCh;
 
@@ -197,7 +208,8 @@ class Analysis
     bool fAutoUpdateDrawing = false;
     Long64_t fUpdateDrawingEveryNEvent = 0;
     Long64_t fCountEventsForUpdate = 0;
-    TCanvas* fCvsOnline = nullptr;
+    TCanvas* fCvsOnline1 = nullptr;
+    TCanvas* fCvsOnline2 = nullptr;
     TVirtualPad* fPadTSDist1 = nullptr;
     TVirtualPad* fPadTSDist2 = nullptr;
     TH1D* fHistTSDist1 = nullptr;
@@ -207,6 +219,8 @@ class Analysis
     TH1D* fHistE = nullptr; ///< energy
     TH2D* fHistAVSCh = nullptr; ///< ADC vs channel-id
     TH2D* fHistEVSCh = nullptr; ///< energy vs channel-id
+    TH2D* fHistdAVSA = nullptr;
+    TH2D* fHistdEVSE = nullptr;
     bool fShowEnergyConversion = true;
 
   private:
@@ -214,8 +228,10 @@ class Analysis
     int    fMaxADC = 8200;
     int    fNumCh = _NUMBER_OF_MODULES_*_NUMBER_OF_CHANNELS_;
     int    fMaxCh = _NUMBER_OF_MODULES_*_NUMBER_OF_CHANNELS_;
-    int    fNumE = 8200;
+    int    fNumE = 8000;
     double fMaxE = 25;
+    int    fNumdE = 8000;
+    double fMaxdE = 12;
 
   // drawing for analysis
   private:

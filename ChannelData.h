@@ -1,41 +1,43 @@
 #ifndef CHANNELDATA_CRPTCR_CD2_HH
 #define CHANNELDATA_CRPTCR_CD2_HH
 
-#define WRITE_ALL_DATA
+#define USE_RICH_DATA
 
 #include "TObject.h"
 
 class ChannelData : public TObject
 {
   public:
-#ifdef WRITE_ALL_DATA
-    UShort_t module;
-    UShort_t id;
+#ifdef USE_RICH_DATA
+    Short_t module;
+    Short_t id;
     Long64_t ts0;
-    UShort_t tsG;
+    Short_t tsG;
     Long64_t ts;
 #endif
-    UShort_t gid;
-    UShort_t energy;
+    Short_t gid;
+    Short_t adc;
+    Double_t energy;
 
     ChannelData() { Clear(); }
     ~ChannelData() {}
 
     void Clear(Option_t* option="") {
-#ifdef WRITE_ALL_DATA
-      module = -1;
-      id = -1;
-      ts0 = -1;
-      tsG = -1;
-      ts = -1;
+#ifdef USE_RICH_DATA
+      module = 0;
+      id = 0;
+      ts0 = 0;
+      tsG = 0;
+      ts = 0;
 #endif
-      gid = -1;
-      energy = -1;
+      gid = 0;
+      adc = 0;
+      energy = 0.;
     }
 
-    void SetData(UShort_t module_, UShort_t id_, Int_t gid_, UShort_t energy_, Long64_t ts0_, UShort_t tsG_, Long64_t ts_)
+    void SetData(Short_t module_, Short_t id_, Int_t gid_, Short_t adc_, Double_t energy_, Long64_t ts0_, Short_t tsG_, Long64_t ts_)
     {
-#ifdef WRITE_ALL_DATA
+#ifdef USE_RICH_DATA
       module = module_;
       id = id_;
       ts0 = ts0_;
@@ -43,6 +45,7 @@ class ChannelData : public TObject
       ts = ts_;
 #endif
       gid = gid_;
+      adc = adc_;
       energy = energy_;
     }
 
