@@ -1,3 +1,13 @@
-/home/daquser/data/LiCD2Irrad/LOG : Short log for each run
 
-run_conversion.C : conversion macro
+Two class Analysis and ChannelData are compiled and loaded to root in LoadLibrary.C
+LoadLibrary.C is called automatically when you type root in bash which is done from rootlogon.C
+
+ChannelData.* : channel data structure containing
+    UShort_t module;
+    UShort_t id;
+    Long64_t ts0;
+    UShort_t tsG;
+    Long64_t ts;
+    UShort_t gid;
+    UShort_t energy;
+
