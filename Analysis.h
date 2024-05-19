@@ -43,8 +43,7 @@ class Analysis
 
   // general
   public:
-    int  GetFakeModule(int module); ///< Get fake module index from real module number 
-    int  GetRealModule(int fake); ///< Get real module number from fake module index
+    int  GetModuleIndex(int module); ///< Get module index from real module number 
     int  GetGlobalID(UShort_t module, UShort_t channel);
     void GetModCh(int globalID, UShort_t &module, UShort_t &channel);
     double GetCalibratedEnergy(int module, int channelID, int adc);
@@ -63,7 +62,7 @@ class Analysis
     void SetADCThreshold(UShort_t value) { fADCThreshold = value; }
     void SetOutputFileName(TString name) { fFileNameOut = name; }
     void SetAutoUpdateDrawing(bool value) { fAutoUpdateDrawing = value; }
-    void SetShowEnergyConversion(bool value) { fShowEnergyConversion = value; }
+    void SetShowEnergyConversion(bool value) { fShowEnergyConversion = true; }
     void SetCoincidenceTSRange(int value) { fCoincidenceTSRange = value; }
     void SetCoincidenceMult(int value) { fCoincidenceMultCut = value; }
 
@@ -73,6 +72,15 @@ class Analysis
     void AnalyzeAlphaTestModule(int module, bool drawHist=false, TString fileName="");
     bool AnalyzeAlphaTest(int module, int channelID, bool drawHist=false, TVirtualPad* cvs=(TVirtualPad*)nullptr);
 
+  public:
+    int  GetDetectorType(int midx, int chid)    const { return fMapDetectorType[midx][chid]; }
+    int  GetDetectorChannel(int midx, int chid) const { return fMapDetectorChannel[midx][chid]; }
+    int  GetModuleGroup(int midx, int chid)     const { return fMapDetectorGroup[midx][chid]; }
+    bool IsModuleReplaced(int midx, int chid)   const { return fMapDetectorReplaced[midx][chid]; }
+    int  GetRFMod(int midx, int chid)           const { return fMapDetectorRFMod[midx][chid]; }
+    int  GetRFMCh(int midx, int chid)           const { return fMapDetectorRFMCh[midx][chid]; }
+    int  GetModuleIndex(int module)             const { return fMapModuleToMIdx[module]; }
+
   private:
     void InitializeConversion();
     void ConfigureDateTime();
@@ -81,6 +89,10 @@ class Analysis
     bool FillDataTree();
     void EndOfConversion();
     void PrintConversionSummary();
+
+    bool CheckDataLineCondition(double adc, int eventStatus, Long64_t timeStamp);
+    bool CheckEventCondition();
+    void AskUpdateDrawing();
 
     void WriteRunParameters(TFile* file, int option);
     void UpdateCvsOnline(bool firstDraw=false);
@@ -107,7 +119,7 @@ class Analysis
     TString fPathToOutput = "/home/daquser/data/LiCD2Irrad/analysis/out/";
     TString fMapFileName = "/home/daquser/data/LiCD2Irrad/analysis/ModCh.in";
     TString fDateTime;
-    int fFileNumberMax;
+    int fFileNumberMax = 10;
     int fFileNumberRange1 = 0;
     int fFileNumberRange2 = 10000;
 
@@ -125,6 +137,8 @@ class Analysis
     bool fIgnoreFileUpdate = false;
     Long64_t fTimeStampPrevTrue = -1; ///< decreased point of time stamp
     Long64_t fTimeStampPrev = -1; ///< previous time stamp
+    Long64_t fTimeStampLastSec = 0;
+    Long64_t fTimeStampLastSecError = 0;
 
     UShort_t fADCThreshold = 0;
 
@@ -161,6 +175,15 @@ class Analysis
     int kNextEvent = 1;
     int kTSError = 2;
 
+    int kSameSecond = 3;
+    int fNextSecond = 4;
+    int kTimeError = 5;
+
+    int fCountTriggerPerSec = 0;
+    int fCountTriggerPerSecError = 0;
+    int fCountEventsPerSec = 0;
+    int fCountEventsPerSecError = 0;
+
   private:
     TFile* fFileSummary = nullptr;
     TTree* fTreeSummary = nullptr;
@@ -195,13 +218,13 @@ class Analysis
     const int fNumScintillator = 1;
     const int fNumFaradayCup   = 1;
 
-    //int fMapDetectorType[_NUMBER_OF_MODULES_][_NUMBER_OF_CHANNELS_];
     int **fMapDetectorType;
     int **fMapDetectorChannel;
     bool **fMapDetectorReplaced;
     int **fMapDetectorGroup;
     int **fMapDetectorRFMod;
     int **fMapDetectorRFMCh;
+    int fMapModuleToMIdx[20];
 
   // drawing for data checking
   private:
@@ -210,6 +233,12 @@ class Analysis
     Long64_t fCountEventsForUpdate = 0;
     TCanvas* fCvsOnline1 = nullptr;
     TCanvas* fCvsOnline2 = nullptr;
+    TVirtualPad* fPadChCount = nullptr;
+    TVirtualPad* fPadADC     = nullptr;
+    TVirtualPad* fPadEVSCh   = nullptr;
+    TVirtualPad* fPaddEVSE   = nullptr;
+    TVirtualPad* fPadTrgRate = nullptr;
+    TVirtualPad* fPadEvtRate = nullptr;
     TVirtualPad* fPadTSDist1 = nullptr;
     TVirtualPad* fPadTSDist2 = nullptr;
     TH1D* fHistTSDist1 = nullptr;
@@ -221,17 +250,27 @@ class Analysis
     TH2D* fHistEVSCh = nullptr; ///< energy vs channel-id
     TH2D* fHistdAVSA = nullptr;
     TH2D* fHistdEVSE = nullptr;
-    bool fShowEnergyConversion = true;
+    TH1D* fHistTriggerRate = nullptr;
+    TH1D* fHistTriggerRateError = nullptr;
+    TH1D* fHistEventRate = nullptr;
+    TH1D* fHistEventRateError = nullptr;
+
+    bool fShowEnergyConversion = false;
 
   private:
-    int    fNumADC = 8200;
-    int    fMaxADC = 8200;
-    int    fNumCh = _NUMBER_OF_MODULES_*_NUMBER_OF_CHANNELS_;
-    int    fMaxCh = _NUMBER_OF_MODULES_*_NUMBER_OF_CHANNELS_;
-    int    fNumE = 8000;
-    double fMaxE = 25;
-    int    fNumdE = 8000;
-    double fMaxdE = 12;
+    const int    fNumADC = 8200;
+    const int    fMaxADC = 8200;
+    const int    fNumCh = _NUMBER_OF_MODULES_*_NUMBER_OF_CHANNELS_;
+    const int    fMaxCh = _NUMBER_OF_MODULES_*_NUMBER_OF_CHANNELS_;
+    const int    fNumE = 8000;
+    const double fMaxE = 25;
+    const int    fNumdE = 8000;
+    const double fMaxdE = 12;
+    const int    fNumRate = 200;
+    const int    fMaxRate = 2000;
+
+    const double fSecondPerTS = 200.*1.e-9;
+    const double fTSPerSecton = 1./(200.*1.e-9);
 
   // drawing for analysis
   private:

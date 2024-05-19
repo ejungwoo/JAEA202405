@@ -11,12 +11,12 @@ void run_conversion(int runNo=11)
   ana -> SetSkipTSError(false); // skip time-stamp error
   ana -> SetStopAtTSError(false); // stop program if time-stamp occur
   ana -> SetADCThreshold(500); // do not write data below ADC threshold
-  ana -> SetDrawOnline(500000); // update online canvas with given event number
+  ana -> SetDrawOnline(50000); // update online canvas with given event number
   ana -> SetAutoUpdateDrawing(true); // do not stop to ask continue
-  ana -> SetCoincidenceTSRange(2); // time-stamp range to reconstruct coincidence
-  ana -> SetCoincidenceMult(2); // only write event with given number of coincidence channels in event
+  //ana -> SetCoincidenceTSRange(1); // time-stamp range to reconstruct coincidence
+  //ana -> SetCoincidenceMult(2); // only write event with given number of coincidence channels in event
 
-  //ana -> SetEventCountLimit(1000); // read event until given event count limit
+  //ana -> SetEventCountLimit(100); // read event until given event count limit
   //ana -> SetFileNumberRange(0,10); // set range of file number
 
   ana -> RunConversion(runNo,"/home/daquser/data/LiCD2Irrad/");

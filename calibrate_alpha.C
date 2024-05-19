@@ -7,12 +7,11 @@ void calibrate_alpha(int runNo=11)
   auto ana = new Analysis();
   ana -> ReadSummaryFile(Form("out/RUN%03d.summary.root",runNo));
 
-  ana -> AnalyzeAlphaTestModule( 9,drawAnalysis,fileName);
-  return;
-  ana -> AnalyzeAlphaTestModule( 1,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule( 2,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule( 9,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule(10,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule(11,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule(12,drawAnalysis,fileName);
+  ana -> AnalyzeAlphaTestModule(0,drawAnalysis,fileName);
+  ana -> AnalyzeAlphaTestModule(1,drawAnalysis,fileName);
+  ana -> AnalyzeAlphaTestModule(2,drawAnalysis,fileName);
+  ana -> AnalyzeAlphaTestModule(3,drawAnalysis,fileName);
+  ana -> AnalyzeAlphaTestModule(4,drawAnalysis,fileName);
+  ana -> AnalyzeAlphaTestModule(5,drawAnalysis,fileName);
+  ana -> AnalyzeAlphaTestModule(6,drawAnalysis,fileName);
 }

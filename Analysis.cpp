@@ -44,14 +44,16 @@ void Analysis::InitializeMapping()
       fMapDetectorRFMCh[iModule][iChannel] = -1;
     }
   }
+  for (int module=0; module<20; ++module)
+    fMapModuleToMIdx[module] = -1;
 
   TString name;
   string buffer;
   bool replaced;
-  UShort_t module0, channelID0, module, channelID, detectorChannel, dES1Group;
+  UShort_t module0, channelID0, module, channelID, detectorChannel, dES1Group, midx;
 
   getline(mapFile, buffer); // skip header
-  while (mapFile >> module >> channelID >> name >> detectorChannel >> dES1Group >> replaced)
+  while (mapFile >> module >> midx >> channelID >> name >> detectorChannel >> dES1Group >> replaced)
   {
     int detectorType = kDummyDetector;
     if (name=="S1Junction")   detectorType = kS1Junction;
@@ -61,16 +63,17 @@ void Analysis::InitializeMapping()
     if (name=="dEDetector")   detectorType = kdEDetector;
     if (name=="Scintillator") detectorType = kScintillator;
     if (name=="FaradayCup")   detectorType = kFaradayCup;
-    int fake = GetFakeModule(module);
-    fMapDetectorType[fake][channelID] = detectorType;
-    fMapDetectorChannel[fake][channelID] = detectorChannel;
-    fMapDetectorReplaced[fake][channelID] = replaced;
-    fMapDetectorGroup[fake][channelID] = dES1Group;
+    fMapDetectorType[midx][channelID] = detectorType;
+    fMapDetectorChannel[midx][channelID] = detectorChannel;
+    fMapDetectorReplaced[midx][channelID] = replaced;
+    fMapDetectorGroup[midx][channelID] = dES1Group;
     if (replaced) {
       mapFile >> module0 >> channelID0;
-      fMapDetectorRFMod[fake][channelID] = module0;
-      fMapDetectorRFMCh[fake][channelID] = channelID0;
+      fMapDetectorRFMod[midx][channelID] = module0;
+      fMapDetectorRFMCh[midx][channelID] = channelID0;
     }
+    if (fMapModuleToMIdx[module]==-1)
+      fMapModuleToMIdx[module] = midx;
   }
   mapFile.close();
 
@@ -86,8 +89,13 @@ void Analysis::InitializeMapping()
 
 void Analysis::RunConversion(int runNo, TString pathIn)
 {
+  if (fEnergyConversionSet==false&&fShowEnergyConversion==true) {
+    coutw << "Energy conversion is not set! Cannot proceed energy conversion." << endl;
+    fShowEnergyConversion = false;
+  }
+
   fRunNo = runNo; 
-  fRunName = Form("RUN%03d",fRunNo);
+  fRunName = Form("[RUN%03d]  ",fRunNo);
   fPathToInput = (pathIn.IsNull() ? TString("/home/daquser/data/LiCD2Irrad/analysis/input/") : pathIn);
 
   InitializeConversion();
@@ -101,32 +109,30 @@ void Analysis::RunConversion(int runNo, TString pathIn)
 void Analysis::AddEnergyCalibration(TString name)
 {
   couti << "Set energy calibration functions from " << name << endl;
-  for (int fake=0; fake<fNumModules; ++fake)
+  for (int midx=0; midx<fNumModules; ++midx)
     for (int iChannel=0; iChannel<fNumChannels; ++iChannel)
-      fFxEnergyConversion[fake][iChannel] = nullptr;
+      fFxEnergyConversion[midx][iChannel] = nullptr;
 
   TFile* file = new TFile(name,"read");
 
-  for (int fake=0; fake<fNumModules; ++fake) {
-    int module = GetRealModule(fake);
+  for (int midx=0; midx<fNumModules; ++midx) {
     for (int iChannel=0; iChannel<fNumChannels; ++iChannel) {
-      fFxEnergyConversion[fake][iChannel] = (TF1*) file -> Get(Form("ae%02d%02d",module,iChannel));
+      fFxEnergyConversion[midx][iChannel] = (TF1*) file -> Get(Form("AToE_%d_%d",midx,iChannel));
     }
   }
 
-  for (int fake=0; fake<fNumModules; ++fake) {
-    int module = GetRealModule(fake);
+  for (int midx=0; midx<fNumModules; ++midx) {
     bool missing = false;
     for (int iChannel=0; iChannel<fNumChannels; ++iChannel)
-      if (fFxEnergyConversion[fake][iChannel]==nullptr) {
+      if (fFxEnergyConversion[midx][iChannel]==nullptr) {
         missing = true;
         break;
       }
     if (!missing) break;
     coute << "Missing ECal: ";
     for (int iChannel=0; iChannel<fNumChannels; ++iChannel)
-      if (fFxEnergyConversion[fake][iChannel]==nullptr)
-        cout << "(" << module << "," << iChannel << ") ";
+      if (fFxEnergyConversion[midx][iChannel]==nullptr)
+        cout << "(" << midx << "," << iChannel << ") ";
     cout << endl;
   }
 
@@ -227,12 +233,12 @@ void Analysis::InitializeAlphaAnalysis(TString fileName)
   WriteRunParameters(fFileAlpha,1);
 }
 
-void Analysis::AnalyzeAlphaTestModule(int module, bool drawAnalysis, TString fileName)
+void Analysis::AnalyzeAlphaTestModule(int midx, bool drawAnalysis, TString fileName)
 {
   InitializeAlphaAnalysis(fileName);
   TCanvas* cvs = nullptr;
   if (drawAnalysis) {
-    cvs = new TCanvas(Form("cvsEModule%d",module),Form("energy of module %d",module),1600,900);
+    cvs = new TCanvas(Form("cvsEMIdx%d",midx),Form("M%d",midx),1600,900);
     cvs -> Divide(4,4);
   }
   bool moduleDataExist = false;
@@ -242,14 +248,14 @@ void Analysis::AnalyzeAlphaTestModule(int module, bool drawAnalysis, TString fil
     if (drawAnalysis)
       pad = cvs->cd(channelID+1);
 
-    bool channelDataExist = AnalyzeAlphaTest(module, channelID, drawAnalysis, pad);
+    bool channelDataExist = AnalyzeAlphaTest(midx, channelID, drawAnalysis, pad);
     moduleDataExist = (moduleDataExist || channelDataExist);
   }
 
   if (drawAnalysis)
   {
     if (!moduleDataExist) {
-      coute << "Module " << module << " is empty!" << endl;
+      coute << "Module " << midx << " is empty!" << endl;
         delete cvs;
     }
     else if (fFileAlpha!=nullptr) {
@@ -263,7 +269,7 @@ void Analysis::AnalyzeAlphaTestModule(int module, bool drawAnalysis, TString fil
     couti << fFileAlpha -> GetName() << endl;
 }
 
-bool Analysis::AnalyzeAlphaTest(int module, int channelID, bool drawAnalysis, TVirtualPad* cvs)
+bool Analysis::AnalyzeAlphaTest(int midx, int channelID, bool drawAnalysis, TVirtualPad* cvs)
 {
   if (fTreeSummary==nullptr) {
     coute << "Summary tree is nullptr! Run ReadSummaryFile before this method!";
@@ -274,9 +280,9 @@ bool Analysis::AnalyzeAlphaTest(int module, int channelID, bool drawAnalysis, TV
   if (cvs==nullptr)
     isSingleDrawing = true;
 
-  couti << Form("channel (%d,%d)",module,channelID) << endl;
+  couti << Form("channel (%d,%d)",midx,channelID) << endl;
 
-  auto gid = GetGlobalID(module, channelID);
+  auto gid = GetGlobalID(midx, channelID);
   if (fFitAlpha==nullptr)
   {
     fFitAlpha = CreateFxTwoAlpha("fxTwoAlpha",0,fMaxADC);
@@ -288,14 +294,14 @@ bool Analysis::AnalyzeAlphaTest(int module, int channelID, bool drawAnalysis, TV
   double mean1, sigma1, amplitude1, mean2, sigma2, amplitude2;
 
   TString nameHist = Form("histE%d",gid);
-  TString titleHist = Form("channel (%d,%d) energy distribution;ADC;count",module,channelID);
+  TString titleHist = Form("channel (%d,%d) energy distribution;ADC;count",midx,channelID);
   auto histE = new TH1D(nameHist,titleHist,fNumADC,0,fMaxADC);
   fTreeSummary -> Project(nameHist, "ch.adc", Form("ch.gid==%d",gid));
   if (histE->GetEntries()==0) {
     coute << "Data is empty!" << endl;
     //0.001810*(x-0.0000)
     if (fFileAlpha!=nullptr) {
-      auto fxADCToEnergyDummy = new TF1(Form("ae%02d%02d",module,channelID),"0.001810*(x-0.0000)",0,10000);
+      auto fxADCToEnergyDummy = new TF1(Form("AToE_%d_%d",midx,channelID),"0.001810*(x-0.0000)",0,10000);
       fxADCToEnergyDummy -> Write();
     }
     return false;
@@ -331,13 +337,8 @@ bool Analysis::AnalyzeAlphaTest(int module, int channelID, bool drawAnalysis, TV
   fFitAlpha2 -> SetParameters(amplitude2, mean2, sigma2);
 
   if (fFileAlpha!=nullptr) {
-    //auto fxADCToEnergy = new TF1(Form("ae%02d%02d",module,channelID),"[0]*(x-[1])",0,10000);
-    //fxADCToEnergy -> SetParameter(0,energyADCRatio);
-    //fxADCToEnergy -> SetParameter(1,ADCOffset);
-    auto fxADCToEnergy = new TF1(Form("ae%02d%02d",module,channelID),Form("%f*(x-%.4f)",energyADCRatio,ADCOffset),0,10000);
+    auto fxADCToEnergy = new TF1(Form("AToE_%d_%d",midx,channelID),Form("%f*(x-%.4f)",energyADCRatio,ADCOffset),0,10000);
     fxADCToEnergy -> Write();
-    //(new TParameter<double>("ADCOffset",ADCOffset)) -> Write();
-    //(new TParameter<double>("ADCEnergyRatio",ADCEnergyRatio)) -> Write();
   }
 
   if (drawAnalysis)
@@ -422,38 +423,61 @@ void Analysis::InitializeDrawing()
 
   if (fUpdateDrawingEveryNEvent>0)
   {
-    fCvsOnline2 = new TCanvas("cvsOnline2",fRunName+" online update canvas 2",1600,450);
-    fCvsOnline1 = new TCanvas("cvsOnline1",fRunName+" online update canvas 1",1600,900);
+    fCvsOnline2 = new TCanvas("cvsTS",fRunName+" online update canvas 2",1600,900);
+    fCvsOnline2 -> Divide(2,2);
+    fPadTrgRate = fCvsOnline2 -> cd(1);
+    fPadEvtRate = fCvsOnline2 -> cd(2);
+    fPadTSDist1 = fCvsOnline2 -> cd(3);
+    fPadTSDist2 = fCvsOnline2 -> cd(4);
+
+    fCvsOnline1 = new TCanvas("cvsOnline",fRunName+" online update canvas 1",1600,900);
     fCvsOnline1 -> Divide(2,2);
-    fCvsOnline1 -> cd(3) -> SetLogz();
-    fCvsOnline2 -> Divide(2,1);
-    fPadTSDist1 = fCvsOnline2 -> cd(1);
-    fPadTSDist2 = fCvsOnline2 -> cd(2);
+    fPadChCount = fCvsOnline1 -> cd(1);
+    fPadADC     = fCvsOnline1 -> cd(2);
+    fPadEVSCh   = fCvsOnline1 -> cd(3);
+    fPaddEVSE   = fCvsOnline1 -> cd(4);
   }
+
+  fHistTriggerRate      = new TH1D("histTrgRateG",fRunName+"trigger rate;trigger/s;count",fNumRate,0,fMaxRate);
+  fHistTriggerRateError = new TH1D("histTrgRateE",fRunName+"Bad trigger rate;trigger/s;count",fNumRate,0,fMaxRate);
+  fHistTriggerRateError -> SetLineStyle(2);
+  fHistTriggerRateError -> SetLineColor(kRed);
+
+  fHistEventRate      = new TH1D("histEvtRateG",fRunName+"event rate;event/s;count",fNumRate,0,fMaxRate);
+  fHistEventRateError = new TH1D("histEvtRateE",fRunName+"Bad event rate;event/s;count",fNumRate,0,fMaxRate);
+  fHistEventRateError -> SetLineStyle(2);
+  fHistEventRateError -> SetLineColor(kRed);
 
   fHistTSDist1 = new TH1D("histTSDist1",fRunName+" TS distance (+);TS-dist;count", 20,0,20);
   fHistTSDist2 = new TH1D("histTSDist2",fRunName+" TS distance (-);TS-dist;count", 50,-1000000,0);
+
   fHistChCount = new TH1D("histChCount",fRunName+" channel count;global-ch;event count", fNumCh,0,fNumCh);
   fHistChCount -> SetFillColor(29);
+
   fHistADC = new TH1D("histADC",fRunName+" ADC (all channels);ADC",fNumADC,0,fMaxADC);
   fHistADC -> SetFillColor(29);
   fHistE = new TH1D("histEnergy",fRunName+" energy (all channels);energy (MeV)",fNumE,0,fMaxE);
   fHistE -> SetFillColor(29);
+
   fHistAVSCh = new TH2D("histAVSCh", fRunName+" ADC vs channel-id;global-ch;ADC", fNumCh,0,fNumCh,fNumADC,0,fMaxADC);
   fHistEVSCh = new TH2D("histEVSCh", fRunName+" energy vs channel-id;global-ch;energy (MeV)", fNumCh,0,fNumCh,fNumE,0,fMaxE);
   fHistdAVSA = new TH2D("histdAVSA", fRunName+" dA vs dA + S1;dA + S1A;dA", fNumADC, 0, 2*fMaxADC, fNumADC, 0, fMaxADC);
   fHistdEVSE = new TH2D("histdEVSE", fRunName+" dE vs dE + S1;dE + S1E (MeV);dE (MeV)", fNumE,0,fMaxE+fMaxdE, fNumdE, 0, fMaxdE);
 
   if (fUpdateDrawingEveryNEvent>0) {
+    SetAttribute(fHistTriggerRate,fPadTrgRate,1);
+    SetAttribute(fHistTriggerRateError,fPadTrgRate,1);
+    SetAttribute(fHistEventRate,fPadEvtRate,1);
+    SetAttribute(fHistEventRateError,fPadEvtRate,1);
     SetAttribute(fHistTSDist1,fPadTSDist1,1);
     SetAttribute(fHistTSDist2,fPadTSDist2,1);
-    SetAttribute(fHistChCount,fCvsOnline1->cd(1));
-    SetAttribute(fHistADC,fCvsOnline1->cd(2));
-    SetAttribute(fHistE,fCvsOnline1->cd(2));
-    SetAttribute(fHistAVSCh,fCvsOnline1->cd(3),1,true);
-    SetAttribute(fHistEVSCh,fCvsOnline1->cd(3),1,true);
-    SetAttribute(fHistdAVSA,fCvsOnline1->cd(4),1,true);
-    SetAttribute(fHistdEVSE,fCvsOnline1->cd(4),1,true);
+    SetAttribute(fHistChCount,fPadChCount);
+    SetAttribute(fHistADC,fPadADC);
+    SetAttribute(fHistE,fPadADC);
+    SetAttribute(fHistAVSCh,fPadEVSCh,1,true);
+    SetAttribute(fHistEVSCh,fPadEVSCh,1,true);
+    SetAttribute(fHistdAVSA,fPaddEVSE,1,true);
+    SetAttribute(fHistdEVSE,fPaddEVSE,1,true);
   }
 
   UpdateCvsOnline(true);
@@ -679,9 +703,6 @@ void Analysis::ReadDataFile()
         continue;
       }
 
-      if (adc < fADCThreshold)
-        continue;
-
       timeStamp = timeStampLocal;
       if (tsGroup>0)
         timeStamp += (Long64_t)(tsGroup) * 0xFFFFFFFFFF; 
@@ -706,31 +727,43 @@ void Analysis::ReadDataFile()
         else if (timeStamp>fTimeStampPrev) eventStatus = kTSError;
       }
 
-      if (eventStatus==kTSError) // time-stamp decreased
-      {
-        if (timeStamp<fTimeStampPrevTrue) {
-          coutt << "Time-stamp error (" << fCountTSError << ") " << fTimeStampPrev << " -> " << timeStamp << endl;
-          fTimeStampPrevTrue = timeStamp;
-          ++fCountTSError;
-        }
-        if (fStopAtTSError) {
-          coute << "Return due to Time-stamp error (" << fCountTSError << ") " << fTimeStampPrev << " -> " << timeStamp << endl;
-          return;
-        }
-        continue;
+      int timeStatus = kSameSecond;
+      double dSecond = (timeStamp-fTimeStampLastSec)*fSecondPerTS;
+      if (dSecond<0) timeStatus = kTimeError;
+      else if (dSecond>1) timeStatus = fNextSecond;
+      else timeStatus = kSameSecond;
+
+      if (timeStatus==kSameSecond) {
+        fCountTriggerPerSec++;
       }
-      else if (eventStatus==kSameEvent) // same event
+      else if (timeStatus==kTimeError) {
+        fCountTriggerPerSecError++;
+      }
+      else if (timeStatus==fNextSecond)
+      {
+        fHistTriggerRate -> Fill(fCountTriggerPerSec);
+        fHistTriggerRateError -> Fill(fCountTriggerPerSecError);
+        fCountTriggerPerSecError = 0;
+        fCountTriggerPerSec = 0;
+        fCountTriggerPerSec++;
+        fTimeStampLastSec = timeStamp;
+        fTimeStampLastSecError = timeStamp;
+      }
+
+      if (CheckDataLineCondition(adc,eventStatus,timeStamp)==false)
+        continue;
+      if (fExitAnalysis)
+        break;
+
+      if (eventStatus==kSameEvent)
       {
         channelData = (ChannelData*) fChannelArray -> ConstructedAt(fCountChannels++);
       }
-      else if (eventStatus==kNextEvent) // next event
+      else if (eventStatus==kNextEvent)
       {
         if (countEventsSingleFile>0) {
           FillDataTree();
-          fdEArrayIdx.clear();
-          fS1ArrayIdx.clear();
-          fdEADC = 0.;
-          fS1ADC = 0.;
+          AskUpdateDrawing();
         }
         if (fExitAnalysis)
           break;
@@ -743,20 +776,36 @@ void Analysis::ReadDataFile()
         fTimeStampPrevTrue = timeStamp;
         fCountEvents++;
         countEventsSingleFile++;
+
+        if (timeStatus==kSameSecond) {
+          fCountEventsPerSec++;
+        }
+        else if (timeStatus==kTimeError) {
+          fCountEventsPerSecError++;
+        }
+        else if (timeStatus==fNextSecond)
+        {
+          fHistEventRate -> Fill(fCountEventsPerSec);
+          fHistEventRateError -> Fill(fCountEventsPerSecError);
+          fCountEventsPerSecError = 0;
+          fCountEventsPerSec = 0;
+          fCountEventsPerSec++;
+        }
       }
 
-      int gid = GetGlobalID(module, channelID);
+      Short_t midx = GetModuleIndex(module);
+      int gid = GetGlobalID(midx, channelID);
       double energy = 0;
       if (fEnergyConversionSet)
-          energy = GetCalibratedEnergy(module,channelID,adc);
-      channelData -> SetData(module,channelID,gid,adc,energy,timeStampLocal,tsGroup,timeStamp);
+          energy = GetCalibratedEnergy(midx,channelID,adc);
+      channelData -> SetData(midx,channelID,gid,adc,energy,timeStampLocal,tsGroup,timeStamp);
       fCountAllChannels++;
 
-      if (fMapDetectorType[GetFakeModule(module)][channelID]==kS1Junction) {
+      if (fMapDetectorType[midx][channelID]==kS1Junction) {
         fS1ArrayIdx.push_back(fCountChannels-1);
         fS1ADC = adc;
       }
-      if (fMapDetectorType[GetFakeModule(module)][channelID]==kdEDetector) {
+      if (fMapDetectorType[midx][channelID]==kdEDetector) {
         fdEArrayIdx.push_back(fCountChannels-1);
         fS1ADC = adc;
       }
@@ -794,6 +843,36 @@ void Analysis::ReadDataFile()
   UpdateCvsOnline();
 }
 
+bool Analysis::CheckDataLineCondition(double adc, int eventStatus, Long64_t timeStamp)
+{
+  if (adc < fADCThreshold)
+    return false;
+
+  if (eventStatus==kTSError) // time-stamp decreased
+  {
+    if (timeStamp<fTimeStampPrevTrue) {
+      coutt << "Time-stamp error (" << fCountTSError << ") " << fTimeStampPrev << " -> " << timeStamp << endl;
+      fTimeStampPrevTrue = timeStamp;
+      ++fCountTSError;
+    }
+    if (fStopAtTSError) {
+      coute << "Exit due to Time-stamp error (" << fCountTSError << ") " << fTimeStampPrev << " -> " << timeStamp << endl;
+      fExitAnalysis = true;
+    }
+    return false;
+  }
+
+  return true;
+}
+
+bool Analysis::CheckEventCondition()
+{
+  if (fCoincidenceMultCut>0)
+    if (fCountChannels!=fCoincidenceMultCut)
+      return false;
+  return true;
+}
+
 bool Analysis::FillDataTree()
 {
   if      (fCountChannels==0) fCoincidenceCount[0]++;
@@ -801,10 +880,6 @@ bool Analysis::FillDataTree()
   else if (fCountChannels==2) fCoincidenceCount[2]++;
   else if (fCountChannels==3) fCoincidenceCount[3]++;
   else if (fCountChannels>=4) fCoincidenceCount[4]++;
-
-  if (fCoincidenceMultCut>0)
-    if (fCountChannels!=fCoincidenceMultCut)
-      return false;
 
   if (1) // if there is coincidence between S1 and dE-detector
   {
@@ -814,8 +889,8 @@ bool Analysis::FillDataTree()
     {
       auto chdE = (ChannelData*) fChannelArray -> At(fdEArrayIdx[0]);
       auto chS1 = (ChannelData*) fChannelArray -> At(fS1ArrayIdx[0]);
-      int groupdE = fMapDetectorGroup[GetFakeModule(chdE->module)][chdE->id];
-      int groupS1 = fMapDetectorGroup[GetFakeModule(chS1->module)][chS1->id];
+      int groupdE = fMapDetectorGroup[chdE->midx][chdE->id];
+      int groupS1 = fMapDetectorGroup[chS1->midx][chS1->id];
       bdE = chdE->energy;
       bdES1 = chdE->energy + chS1->energy;
       if (groupdE==groupS1) {
@@ -823,12 +898,24 @@ bool Analysis::FillDataTree()
         fHistdEVSE -> Fill(chdE->energy, chdE->energy + chS1->energy);
       }
     }
+    fdEArrayIdx.clear();
+    fS1ArrayIdx.clear();
+    fdEADC = 0.;
+    fS1ADC = 0.;
   }
+
+  if (CheckEventCondition()==false)
+    return false;
 
   bTimeStamp = fTimeStampPrev;
   bNumChannels = fCountChannels;
   fTreeOut -> Fill();
 
+  return true;
+}
+
+void Analysis::AskUpdateDrawing()
+{
   if (fUpdateDrawingEveryNEvent>=0)
   {
     fCountEventsForUpdate++;
@@ -873,7 +960,6 @@ bool Analysis::FillDataTree()
       }
     }
   }
-  return true;
 }
 
 void Analysis::UpdateCvsOnline(bool firstDraw)
@@ -897,7 +983,6 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
         line -> SetLineStyle(2);
         line -> Draw("samel");
       }
-      //auto tt = new TText((iModule+0.5)*fNumChannels,yMax*0.1,Form("%d",GetRealModule(iModule)));
       auto tt = new TText((iModule+0.5)*fNumChannels,yMax*0.1,fDetectorName[fMapDetectorType[iModule][0]]);
       //tt -> SetTextColor(kGray);
       tt -> SetTextAlign(22);
@@ -913,23 +998,33 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
     }
   };
 
+  fPadTrgRate -> cd();
+  fHistTriggerRate -> Draw();
+  fHistTriggerRateError -> Draw("same");
+  fPadEvtRate -> cd();
+  fHistEventRate -> Draw();
+  fHistEventRateError -> Draw("same");
+
   fPadTSDist1 -> cd();
   fHistTSDist1 -> Draw();
   fPadTSDist2 -> cd();
   fHistTSDist2 -> Draw();
 
-  fCvsOnline1 -> cd(1);
+  //fCvsOnline1 -> cd(1);
+  fPadChCount -> cd();
   fHistChCount -> Draw();
   DrawModuleBoundary(fHistChCount->GetMaximum()*1.05);
   TakeCareOfStatsBox(fHistChCount);
 
-  fCvsOnline1 -> cd(2);
+  //fCvsOnline1 -> cd(2);
+  fPadADC -> cd();
   TH1D* histEOnline = fHistADC;
   if (fShowEnergyConversion)
     histEOnline = fHistE;
   histEOnline -> Draw();
 
-  fCvsOnline1 -> cd(3);
+  //fCvsOnline1 -> cd(3);
+  fPadEVSCh -> cd();
   TH2D* hist2DOnline = fHistAVSCh;
   double yMax = fMaxADC;
   if (fShowEnergyConversion) {
@@ -940,13 +1035,16 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
   DrawModuleBoundary(yMax);
   TakeCareOfStatsBox(hist2DOnline);
 
-  fCvsOnline1 -> cd(4);
+  //fCvsOnline1 -> cd(4);
+  fPaddEVSE -> cd();
   TH2D* histdEEOnline = fHistdAVSA;
   if (fShowEnergyConversion) {
     histdEEOnline = fHistdEVSE;
   }
   histdEEOnline -> Draw("colz");
 
+  fCvsOnline2 -> Modified();
+  fCvsOnline2 -> Update();
   fCvsOnline1 -> Modified();
   fCvsOnline1 -> Update();
 }
@@ -954,6 +1052,7 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
 void Analysis::EndOfConversion()
 {
   fFileOut -> cd();
+  couti << "Writting tree ..." << endl;
   fTreeOut -> Write();
 
   if (fCvsOnline1!=nullptr)
@@ -988,33 +1087,24 @@ void Analysis::PrintConversionSummary()
   couti << "Number of events with =>4 coincidence channels: " << fCoincidenceCount[4] << endl;
 }
 
-int Analysis::GetFakeModule(int module)
+int Analysis::GetModuleIndex(int module)
 {
-  if (module>2) return (module - 6);
-  return module;
+  return fMapModuleToMIdx[module];
 }
 
-int Analysis::GetRealModule(int fake)
+int Analysis::GetGlobalID(UShort_t midx, UShort_t channelID)
 {
-  if (fake>2) return (fake + 6);
-  return fake;
-}
-
-int Analysis::GetGlobalID(UShort_t module, UShort_t channelID)
-{
-  if (module>2) module = module - 6;
-  int globalID = module*fNumChannels + channelID;
+  int globalID = midx*fNumChannels + channelID;
   return globalID;
 }
 
-void Analysis::GetModCh(int globalID, UShort_t &module, UShort_t &channelID)
+void Analysis::GetModCh(int globalID, UShort_t &midx, UShort_t &channelID)
 {
-  module = globalID / fNumChannels;
-  if (module>2) module = module + 6;
+  midx = globalID / fNumChannels;
   channelID = globalID % fNumChannels;
 }
 
-double Analysis::GetCalibratedEnergy(int module, int channelID, int adc)
+double Analysis::GetCalibratedEnergy(int midx, int channelID, int adc)
 {
-  return fFxEnergyConversion[GetFakeModule(module)][channelID] -> Eval(adc);
+  return fFxEnergyConversion[midx][channelID] -> Eval(adc);
 }
