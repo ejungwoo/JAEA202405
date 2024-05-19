@@ -1,17 +1,30 @@
-void calibrate_alpha(int runNo=11)
+void calibrate_alpha(int runNo=13)
 {
   bool drawAnalysis = true;
-  TString fileName = "dummy.root";
-  //TString fileName = ""; // for creating auto-named calibration file
 
   auto ana = new Analysis();
   ana -> ReadSummaryFile(Form("out/RUN%03d.summary.root",runNo));
 
-  ana -> AnalyzeAlphaTestModule(0,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule(1,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule(2,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule(3,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule(4,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule(5,drawAnalysis,fileName);
-  ana -> AnalyzeAlphaTestModule(6,drawAnalysis,fileName);
+  if (runNo==11) {
+    ana -> AnalyzeAlphaTestModule(1,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(2,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(3,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(4,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(5,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(6,drawAnalysis);
+  }
+  else if (runNo==13) {
+    ana -> SetNumADC(500);
+    ana -> AnalyzeAlphaTestModule(0,drawAnalysis);
+  }
+  else {
+    ana -> SetAlphaTestFile("dummy.root");
+    ana -> AnalyzeAlphaTestModule(1,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(2,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(3,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(4,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(5,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(6,drawAnalysis);
+    ana -> AnalyzeAlphaTestModule(0,drawAnalysis);
+  }
 }

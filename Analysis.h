@@ -51,6 +51,7 @@ class Analysis
   // conversion
   public:
     void RunConversion(int runNo, TString pathToInputFile);
+    void SetConversionFile(TString fileName="");
     void AddEnergyCalibration(TString name);
     void SetDrawOnline(Long64_t everyNEvents=10000) { fUpdateDrawingEveryNEvent = everyNEvents; }
     void SetSkipTSError(bool ignore=true) { fSkipTSError = ignore; }
@@ -60,15 +61,19 @@ class Analysis
     void SetReturnIfNoFile(bool value) { fReturnIfNoFile = value; }
     void SetIgnoreFileUpdate(bool value) { fIgnoreFileUpdate = value; }
     void SetADCThreshold(UShort_t value) { fADCThreshold = value; }
-    void SetOutputFileName(TString name) { fFileNameOut = name; }
     void SetAutoUpdateDrawing(bool value) { fAutoUpdateDrawing = value; }
     void SetShowEnergyConversion(bool value) { fShowEnergyConversion = true; }
     void SetCoincidenceTSRange(int value) { fCoincidenceTSRange = value; }
     void SetCoincidenceMult(int value) { fCoincidenceMultCut = value; }
+    void SetdES1Coincidence(bool value) { fCoincidenceMultCut = 2; fdES1CoincidenceMode = value; }
+
+    void SetNumADC(int n) { fNumADC = n; }
+    void SetNumE(int n) { fNumE = n; }
 
   // alpha energy calibration
   public:
     void ReadSummaryFile(TString fileName);
+    void SetAlphaTestFile(TString fileName="");
     void AnalyzeAlphaTestModule(int module, bool drawHist=false, TString fileName="");
     bool AnalyzeAlphaTest(int module, int channelID, bool drawHist=false, TVirtualPad* cvs=(TVirtualPad*)nullptr);
 
@@ -82,9 +87,7 @@ class Analysis
     int  GetModuleIndex(int module)             const { return fMapModuleToMIdx[module]; }
 
   private:
-    void InitializeConversion();
     void ConfigureDateTime();
-    void MakeOutputFile();
     void ReadDataFile();
     bool FillDataTree();
     void EndOfConversion();
@@ -99,9 +102,8 @@ class Analysis
     void SetAttribute(TH1* hist, TVirtualPad* pad, int npad=1, bool is2D=false);
     void SetAttribute(TH1* hist, int npad=1, bool is2D=false) { SetAttribute(hist, (TVirtualPad*)nullptr, npad, is2D); }
 
-    void InitializeMapping();
+    void InitializeAnalysis();
     void InitializeDrawing();
-    void InitializeAlphaAnalysis(TString fileName="");
 
   private:
     Double_t FxTwoAlpha(Double_t *xy, Double_t *par);
@@ -152,6 +154,7 @@ class Analysis
     const int fNumChannels = _NUMBER_OF_CHANNELS_;
 
     TClonesArray *fChannelArray = nullptr;
+    bool  fdES1CoincidenceMode = false;
     Int_t fCoincidenceCount[5];
     Int_t fCoincidenceTSRange = 0;
     Int_t fCoincidenceMultCut = -1;
@@ -258,11 +261,11 @@ class Analysis
     bool fShowEnergyConversion = false;
 
   private:
-    const int    fNumADC = 8200;
+    int    fNumADC = 8200;
     const int    fMaxADC = 8200;
     const int    fNumCh = _NUMBER_OF_MODULES_*_NUMBER_OF_CHANNELS_;
     const int    fMaxCh = _NUMBER_OF_MODULES_*_NUMBER_OF_CHANNELS_;
-    const int    fNumE = 8000;
+    int    fNumE = 8000;
     const double fMaxE = 25;
     const int    fNumdE = 8000;
     const double fMaxdE = 12;
