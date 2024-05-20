@@ -39,52 +39,72 @@ void Analysis::InitializeAnalysis()
       fMapDetectorType[midx][iChannel] = kDummyDetector;
       fMapDetectorChannel[midx][iChannel] = -1;
       fMapDetectorReplaced[midx][iChannel] = false;
+      fMapDetectorGroup[midx][iChannel]  = 0;
       fMapDetectorRFMod[midx][iChannel] = -1;
       fMapDetectorRFMCh[midx][iChannel] = -1;
-      fMapDetectorGroup[midx][iChannel]  = 0;
     }
   }
-  for (int module=0; module<20; ++module)
-    fMapModuleToMIdx[module] = -1;
+  for (int iModule=0; iModule<20; ++iModule)
+    fMapFEToModuleIndex[iModule] = -1;
+
+
+  fMapDetectorToGlobalID = new int*[10];
+  for (int det=0; det<10; ++det) {
+    fMapDetectorToGlobalID[det] = new int[32];
+    for (int dch=0; dch<10; ++dch) {
+      fMapDetectorToGlobalID[det][dch] = -1;
+    }
+  }
+
+  fMapGlobalIDToModuleIndex = new int[fNumCh];
+  fMapGlobalIDToMCh = new int[fNumCh];
+  for (int gid=0; gid<fNumCh; ++gid) {
+    fMapGlobalIDToModuleIndex[gid] = -1;
+    fMapGlobalIDToMCh[gid] = -1;
+  }
+
+  fDetectorName[kDummyDetector] = "X";
+  fDetectorName[kdEDetector   ] = "dEDetector";
+  fDetectorName[kS1Junction   ] = "S1Junction";
+  fDetectorName[kS3Junction   ] = "S3Junction";
+  fDetectorName[kS3Ohmic      ] = "S3Ohmic";
+  fDetectorName[kScintillator ] = "Scintillator";
+  fDetectorName[kFaradayCup   ] = "FaradayCup";
 
   TString name;
   string buffer;
   bool replaced;
-  UShort_t module0, channelID0, module, channelID, detectorChannel, dES1Group, midx;
+  UShort_t module0, channelID0, FENumber, mch, dch, dES1Group, midx;
 
   getline(mapFile, buffer); // skip header
-  while (mapFile >> module >> midx >> channelID >> name >> detectorChannel >> dES1Group >> replaced)
+  while (mapFile >> FENumber >> midx >> mch >> name >> dch >> dES1Group >> replaced)
   {
-    int detectorType = kDummyDetector;
-    if (name=="S1Junction")   detectorType = kS1Junction;
-    if (name=="S1Ohmic")      detectorType = kS1Ohmic;
-    if (name=="S3Junction")   detectorType = kS3Junction;
-    if (name=="S3Ohmic")      detectorType = kS3Ohmic;
-    if (name=="dEDetector")   detectorType = kdEDetector;
-    if (name=="Scintillator") detectorType = kScintillator;
-    if (name=="FaradayCup")   detectorType = kFaradayCup;
-    fMapDetectorType[midx][channelID] = detectorType;
-    fMapDetectorChannel[midx][channelID] = detectorChannel;
-    fMapDetectorReplaced[midx][channelID] = replaced;
-    fMapDetectorGroup[midx][channelID] = dES1Group;
+    int det = kDummyDetector;
+    for (det=0; det<fNumDetectors; ++det)
+      if (fDetectorName[det]==name)
+        break;
+    if (det==kDummyDetector) {
+      coute << "Dummy detector module! " << endl;
+      coute << "  " << FENumber << " " << midx << " " << mch << " " << name << " " << dch << endl;
+      continue;
+    }
+    fMapDetectorType[midx][mch] = det;
+    fMapDetectorChannel[midx][mch] = dch;
+    fMapDetectorReplaced[midx][mch] = replaced;
+    fMapDetectorGroup[midx][mch] = dES1Group;
     if (replaced) {
       mapFile >> module0 >> channelID0;
-      fMapDetectorRFMod[midx][channelID] = module0;
-      fMapDetectorRFMCh[midx][channelID] = channelID0;
+      fMapDetectorRFMod[midx][mch] = module0;
+      fMapDetectorRFMCh[midx][mch] = channelID0;
     }
-    if (fMapModuleToMIdx[module]==-1)
-      fMapModuleToMIdx[module] = midx;
+    if (fMapFEToModuleIndex[FENumber]==-1)
+      fMapFEToModuleIndex[FENumber] = midx;
+    auto gid = GetGlobalID(midx, mch);
+    fMapDetectorToGlobalID[det][dch] = gid;
+    fMapGlobalIDToModuleIndex[gid] = midx;
+    fMapGlobalIDToMCh[gid] = mch;
   }
   mapFile.close();
-
-  fDetectorName[kDummyDetector] = "X";
-  fDetectorName[kS1Junction   ] = "S1J";
-  fDetectorName[kS1Ohmic      ] = "S1O";
-  fDetectorName[kS3Junction   ] = "S3J";
-  fDetectorName[kS3Ohmic      ] = "S3O";
-  fDetectorName[kdEDetector   ] = "dE";
-  fDetectorName[kScintillator ] = "SC";
-  fDetectorName[kFaradayCup   ] = "FC";
 
   for (int midx=0; midx<fNumModules; ++midx)
     for (int iChannel=0; iChannel<fNumChannels; ++iChannel)
@@ -112,7 +132,7 @@ void Analysis::InitializeAnalysis()
 
 void Analysis::RunConversion(int runNo, TString pathIn)
 {
-  if (fEnergyConversionSet==false&&fShowEnergyConversion==true) {
+  if (fEnergyConversionIsSet==false&&fShowEnergyConversion==true) {
     coutw << "Energy conversion is not set! Cannot proceed energy conversion." << endl;
     fShowEnergyConversion = false;
   }
@@ -128,7 +148,7 @@ void Analysis::RunConversion(int runNo, TString pathIn)
   EndOfConversion();
 }
 
-void Analysis::AddEnergyCalibration(TString name)
+void Analysis::AddAlphaCalibrationFile(TString name)
 {
   couti << "Set energy calibration functions from " << name << endl;
 
@@ -158,7 +178,7 @@ void Analysis::AddEnergyCalibration(TString name)
     cout << endl;
   }
 
-  fEnergyConversionSet = true;
+  fEnergyConversionIsSet = true;
   //file -> Close();
 }
 
@@ -261,17 +281,17 @@ void Analysis::AnalyzeAlphaTestModule(int midx, bool drawAnalysis, TString fileN
 
   TCanvas* cvs = nullptr;
   if (drawAnalysis) {
-    cvs = new TCanvas(Form("cvsEMIdx%d",midx),Form("M%d",midx),1600,900);
+    cvs = new TCanvas(Form("cvs%d",midx),GetDetectorTitle(midx),1600,900);
     cvs -> Divide(4,4);
   }
   bool moduleDataExist = false;
-  for (auto channelID=0; channelID<fNumChannels; ++channelID)
+  for (auto mch=0; mch<fNumChannels; ++mch)
   {
     TVirtualPad* pad = nullptr;
     if (drawAnalysis)
-      pad = cvs->cd(channelID+1);
+      pad = cvs->cd(mch+1);
 
-    bool channelDataExist = AnalyzeAlphaTest(midx, channelID, drawAnalysis, pad);
+    bool channelDataExist = AnalyzeAlphaTest(midx, mch, drawAnalysis, pad);
     moduleDataExist = (moduleDataExist || channelDataExist);
   }
 
@@ -292,7 +312,7 @@ void Analysis::AnalyzeAlphaTestModule(int midx, bool drawAnalysis, TString fileN
     couti << fFileAlpha -> GetName() << endl;
 }
 
-bool Analysis::AnalyzeAlphaTest(int midx, int channelID, bool drawAnalysis, TVirtualPad* cvs)
+bool Analysis::AnalyzeAlphaTest(int midx, int mch, bool drawAnalysis, TVirtualPad* cvs)
 {
   if (fTreeSummary==nullptr) {
     coute << "Summary tree is nullptr! Run ReadSummaryFile before this method!";
@@ -303,9 +323,10 @@ bool Analysis::AnalyzeAlphaTest(int midx, int channelID, bool drawAnalysis, TVir
   if (cvs==nullptr)
     isSingleDrawing = true;
 
-  couti << Form("channel (%d,%d)",midx,channelID) << endl;
+  auto detectorTitle = GetDetectorTitle(midx,mch,1);
+  couti << detectorTitle << endl;
 
-  auto gid = GetGlobalID(midx, channelID);
+  auto gid = GetGlobalID(midx, mch);
   if (fFitAlpha==nullptr)
   {
     fFitAlpha = CreateFxTwoAlpha("fxTwoAlpha",0,fMaxADC);
@@ -317,13 +338,13 @@ bool Analysis::AnalyzeAlphaTest(int midx, int channelID, bool drawAnalysis, TVir
   double mean1, sigma1, amplitude1, mean2, sigma2, amplitude2;
 
   TString nameHist = Form("histE%d",gid);
-  TString titleHist = Form("channel (%d,%d) energy distribution;ADC;count",midx,channelID);
+  TString titleHist = detectorTitle + ";ADC;count";
   auto histE = new TH1D(nameHist,titleHist,fNumADC,0,fMaxADC);
   fTreeSummary -> Project(nameHist, "ch.adc", Form("ch.adc>1000&&ch.gid==%d",gid));
   if (histE->GetEntries()==0) {
     coute << "Data is empty!" << endl;
     if (fFileAlpha!=nullptr) {
-      auto fxADCToEnergyDummy = new TF1(Form("AToE_%d_%d",midx,channelID),"0.005*(x-0.0000)",0,10000);
+      auto fxADCToEnergyDummy = new TF1(Form("AToE_%d_%d",midx,mch),"0.005*(x-0.0000)",0,10000);
       fxADCToEnergyDummy -> Write();
     }
     return false;
@@ -359,7 +380,7 @@ bool Analysis::AnalyzeAlphaTest(int midx, int channelID, bool drawAnalysis, TVir
   fFitAlpha2 -> SetParameters(amplitude2, mean2, sigma2);
 
   if (fFileAlpha!=nullptr) {
-    auto fxADCToEnergy = new TF1(Form("AToE_%d_%d",midx,channelID),Form("%f*(x-%.4f)",energyADCRatio,ADCOffset),0,10000);
+    auto fxADCToEnergy = new TF1(Form("AToE_%d_%d",midx,mch),Form("%f*(x-%.4f)",energyADCRatio,ADCOffset),0,10000);
     fxADCToEnergy -> Write();
   }
 
@@ -425,7 +446,8 @@ void Analysis::InitializeDrawing()
   {
     if (canvasMode==3) {
       fCvsOnline1 = new TCanvas("cvsOnline",fRunName+" online update canvas 1",1800,800);
-      fCvsOnline1 -> Divide(3,2);
+      fCvsOnline1 -> SetMargin(0,0,0,0);
+      fCvsOnline1 -> Divide(3,2,0,0);
 
       fPadTrgRate = fCvsOnline1 -> cd(1);
       fPadEvtRate = fCvsOnline1 -> cd(1);
@@ -522,7 +544,7 @@ void Analysis::InitializeDrawing()
   fHistTSDist1 -> SetStats(0);
   //fHistTSDist2 -> SetStats(0);
 
-  fHistChCount = new TH1D("histChCount","Channel count;;event count", fNumCh,0,fNumCh);
+  fHistChCount = new TH1D("histChCount","Channel count;;", fNumCh,0,fNumCh);
   fHistChCount -> SetStats(0);
   fHistChCount -> SetFillColor(29);
 
@@ -531,8 +553,8 @@ void Analysis::InitializeDrawing()
   fHistE = new TH1D("histEnergy","Energy (all channels);energy (MeV)",fNumE,0,fMaxE);
   fHistE -> SetFillColor(29);
 
-  fHistAVSCh = new TH2D("histAVSCh", "ADC vs channel-id;;ADC", fNumCh,0,fNumCh,fNumADC,0,fMaxADC);
-  fHistEVSCh = new TH2D("histEVSCh", "Energy vs channel-id;;energy (MeV)", fNumCh,0,fNumCh,fNumE,0,fMaxE);
+  fHistAVSCh = new TH2D("histAVSCh", "ADC vs module-ch;;ADC", fNumCh,0,fNumCh,fNumADC,0,fMaxADC);
+  fHistEVSCh = new TH2D("histEVSCh", "Energy vs module-ch;;energy (MeV)", fNumCh,0,fNumCh,fNumE,0,fMaxE);
   fHistdAVSA = new TH2D("histdAVSA", "dA vs dA + S1;dA + S1A;dA", fNumADC, 0, 2*fMaxADC, fNumADC, 0, fMaxADC);
   fHistdEVSE = new TH2D("histdEVSE", "dE vs dE + S1;dE + S1E (MeV);dE (MeV)", fNumE,0,fMaxE+fMaxdE, fNumdE, 0, fMaxdE);
   fHistAVSCh -> SetStats(0);
@@ -541,7 +563,22 @@ void Analysis::InitializeDrawing()
   fHistdEVSE -> SetStats(0);
 
   if (fUpdateDrawingEveryNEvent>0) {
-    if (canvasMode==1||canvasMode==2) {
+    if (canvasMode==3) {
+      SetAttribute(fHistTriggerRate,fPadTrgRate,1);
+      SetAttribute(fHistTriggerRateError,fPadTrgRate,1);
+      SetAttribute(fHistEventRate,fPadEvtRate,1);
+      SetAttribute(fHistEventRateError,fPadEvtRate,1);
+      SetAttribute(fHistTSDist1,fPadTSDist1,16);
+      SetAttribute(fHistTSDist2,fPadTSDist2,16);
+      SetAttribute(fHistChCount,fPadChCount);
+      SetAttribute(fHistADC,fPadADC);
+      SetAttribute(fHistE,fPadADC);
+      SetAttribute(fHistAVSCh,fPadEVSCh,1,true);
+      SetAttribute(fHistEVSCh,fPadEVSCh,1,true);
+      SetAttribute(fHistdAVSA,fPaddEVSE,1,true);
+      SetAttribute(fHistdEVSE,fPaddEVSE,1,true);
+    }
+    else if (canvasMode==1||canvasMode==2) {
       SetAttribute(fHistTriggerRate,fPadTrgRate,16);
       SetAttribute(fHistTriggerRateError,fPadTrgRate,16);
       SetAttribute(fHistEventRate,fPadEvtRate,16);
@@ -573,23 +610,22 @@ void Analysis::InitializeDrawing()
     }
   }
 
-  auto SetGIDLabels = [this](TH1* hist)
-  {
-    for (int midx=0; midx<fNumModules; ++midx) {
-      for (int iChannel=0; iChannel<fNumChannels; ++iChannel) {
-        if (fMapDetectorReplaced[midx][iChannel])
-        {
-          auto detectorName = fDetectorName[fMapDetectorType[midx][iChannel]];
-          auto detectorChannel = fMapDetectorChannel[midx][iChannel];
-          auto gid = GetGlobalID(midx,iChannel);
-          TString title = Form("%s%d",detectorName.Data(),detectorChannel);
-          hist -> GetXaxis() -> SetBinLabel(gid+1,title);
-        }
-      }
-    }
-  };
-
-  SetGIDLabels(fHistChCount);
+  //auto TakeCareOfLabels = [this](TH1* hist)
+  //{
+  //  for (int midx=0; midx<fNumModules; ++midx) {
+  //    for (int iChannel=0; iChannel<fNumChannels; ++iChannel) {
+  //      if (fMapDetectorReplaced[midx][iChannel])
+  //      {
+  //        auto detectorName = fDetectorName[fMapDetectorType[midx][iChannel]];
+  //        auto dch = fMapDetectorChannel[midx][iChannel];
+  //        auto gid = GetGlobalID(midx,iChannel);
+  //        TString title = Form("%s%d",detectorName.Data(),dch);
+  //        hist -> GetXaxis() -> SetBinLabel(gid+1,title);
+  //      }
+  //    }
+  //  }
+  //};
+  //TakeCareOfLabels(fHistChCount);
 
   UpdateCvsOnline(true);
 }
@@ -725,7 +761,7 @@ void Analysis::ReadDataFile()
   streamsize fileSizeOld = 0; // Size of opened Raw-Data file
   const streamsize fileSizeMax = 500000000; // 500 MB
   UShort_t countInputs = fFileNumberRange1; // Number of Files read
-  UShort_t module, channelID, adc;
+  UShort_t FENumber, mch, adc;
   Long64_t timeStampLocal, timeStamp;
   Int_t tsGroup;
   Int_t numData = 0;
@@ -747,7 +783,7 @@ void Analysis::ReadDataFile()
     couti << "Reading " << fileNameInput << endl;
 
     countOpenFileTrials = 0;
-    while (1) // endless loop (2) to check the status of the Raw-Data file //
+    while (1)
     {
       fileIn.open(fileNameInput);
       if (fileIn.fail())
@@ -814,9 +850,9 @@ void Analysis::ReadDataFile()
     while (fileIn >> buffer)
     {
       countLine++;
-      numData = (Int_t) sscanf(buffer, "%hu,%hu,%hu,%lld,%hu", &module, &channelID, &adc, &timeStampLocal, &tsGroup);
+      numData = (Int_t) sscanf(buffer, "%hu,%hu,%hu,%lld,%hu", &FENumber, &mch, &adc, &timeStampLocal, &tsGroup);
       if (numData != 5) {
-        coute << TString::Format("Number of data in line is not 5 (%d) %u %u %u %lld %u", numData, module, channelID, adc, timeStampLocal, tsGroup) << endl;
+        coute << TString::Format("Number of data in line is not 5 (%d) %u %u %u %lld %u", numData, FENumber, mch, adc, timeStampLocal, tsGroup) << endl;
         continue;
       }
 
@@ -918,22 +954,24 @@ void Analysis::ReadDataFile()
         fTimeStampPrevTrue = timeStamp;
       }
 
-      Short_t midx = GetModuleIndex(module);
-      int gid = GetGlobalID(midx, channelID);
+      Short_t midx = GetModuleIndex(FENumber);
+      int gid = GetGlobalID(midx, mch);
       double energy = 0;
-      if (fEnergyConversionSet)
-          energy = GetCalibratedEnergy(midx,channelID,adc);
-      channelData -> SetData(midx,channelID,gid,adc,energy,timeStampLocal,tsGroup,timeStamp);
+      if (fEnergyConversionIsSet)
+          energy = GetCalibratedEnergy(midx,mch,adc);
+      auto det = fMapDetectorType[midx][mch];
+      auto dch = fMapDetectorChannel[midx][mch];
+      channelData -> SetData(midx,mch,det,dch,gid,adc,energy,timeStampLocal,tsGroup,timeStamp);
       fCountAllChannels++;
 
 
       if (fdES1CoincidenceMode)
       {
-        if (fMapDetectorType[midx][channelID]==kS1Junction) {
+        if (fMapDetectorType[midx][mch]==kS1Junction) {
           fS1ArrayIdx.push_back(fCountChannels-1);
           fS1ADC = adc;
         }
-        if (fMapDetectorType[midx][channelID]==kdEDetector) {
+        if (fMapDetectorType[midx][mch]==kdEDetector) {
           fdEArrayIdx.push_back(fCountChannels-1);
           fS1ADC = adc;
         }
@@ -944,7 +982,7 @@ void Analysis::ReadDataFile()
         fHistChCount -> Fill(gid);
         fHistADC -> Fill(adc);
         fHistAVSCh -> Fill(gid, adc);
-        if (fEnergyConversionSet) {
+        if (fEnergyConversionIsSet) {
           fHistEVSCh -> Fill(gid, energy);
           fHistE -> Fill(energy);
         }
@@ -1020,8 +1058,8 @@ bool Analysis::FillDataTree()
       {
         auto chdE = (ChannelData*) fChannelArray -> At(fdEArrayIdx[0]);
         auto chS1 = (ChannelData*) fChannelArray -> At(fS1ArrayIdx[0]);
-        int groupdE = fMapDetectorGroup[chdE->midx][chdE->id];
-        int groupS1 = fMapDetectorGroup[chS1->midx][chS1->id];
+        int groupdE = fMapDetectorGroup[chdE->midx][chdE->mch];
+        int groupS1 = fMapDetectorGroup[chS1->midx][chS1->mch];
         bdE = chdE->energy;
         bdES1 = chdE->energy + chS1->energy;
         if (groupdE==groupS1) {
@@ -1115,7 +1153,8 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
         line -> SetLineStyle(2);
         line -> Draw("samel");
       }
-      auto tt = new TText((midx+0.5)*fNumChannels,-yMax*0.1,fDetectorName[fMapDetectorType[midx][0]]);
+      TString detectorName = TString(fDetectorName[fMapDetectorType[midx][0]](0,3));
+      auto tt = new TText((midx+0.5)*fNumChannels,-yMax*0.1,detectorName);
       tt -> SetTextAlign(22);
       tt -> Draw("same");
     }
@@ -1240,26 +1279,49 @@ void Analysis::PrintConversionSummary()
   couti << "Number of events with =>4 coincidence channels: " << fCoincidenceCount[4] << endl;
 }
 
-int Analysis::GetModuleIndex(int module)
+int Analysis::GetModuleIndex(int FENumber)
 {
-  return fMapModuleToMIdx[module];
+  return fMapFEToModuleIndex[FENumber];
 }
 
-int Analysis::GetGlobalID(UShort_t midx, UShort_t channelID)
+int Analysis::GetGlobalID(UShort_t midx, UShort_t mch)
 {
-  int globalID = midx*fNumChannels + channelID;
+  int globalID = midx*fNumChannels + mch;
   return globalID;
 }
 
-void Analysis::GetModCh(int globalID, UShort_t &midx, UShort_t &channelID)
+void Analysis::GetModCh(int globalID, UShort_t &midx, UShort_t &mch)
 {
   midx = globalID / fNumChannels;
-  channelID = globalID % fNumChannels;
+  mch = globalID % fNumChannels;
 }
 
-double Analysis::GetCalibratedEnergy(int midx, int channelID, int adc)
+void Analysis::DetectorToModule(int det, int dch, int &midx, int &mch)
 {
-  if (fFxEnergyConversion[midx][channelID]==nullptr)
-    coute << "Energy conversion (" << midx << " " << channelID << ") is nullptr!" << endl;
-  return fFxEnergyConversion[midx][channelID] -> Eval(adc);
+  auto gid = fMapDetectorToGlobalID[det][dch];
+  midx = fMapGlobalIDToModuleIndex[gid];
+  mch = fMapGlobalIDToMCh[gid];
+}
+
+TString Analysis::GetDetectorTitle(int midx, int mch, bool addChannel)
+{
+  int det = fMapDetectorType[midx][mch];
+  int dch = fMapDetectorChannel[midx][mch];
+  TString detectorTitle = fDetectorName[det];
+  if (addChannel)
+    detectorTitle = detectorTitle + Form("(%d)",dch);
+  return detectorTitle;
+}
+
+bool ECalErrorWasSentOut = false;
+double Analysis::GetCalibratedEnergy(int midx, int mch, int adc)
+{
+  if (fFxEnergyConversion[midx][mch]==nullptr) {
+    if (!ECalErrorWasSentOut) {
+      coute << "Energy conversion (" << midx << " " << mch << ") is nullptr! ..." << endl;
+      ECalErrorWasSentOut = true;
+    }
+    return 0;
+  }
+  return fFxEnergyConversion[midx][mch] -> Eval(adc);
 }

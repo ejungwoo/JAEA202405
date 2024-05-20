@@ -4,6 +4,15 @@
 #define _NUMBER_OF_MODULES_ 7
 #define _NUMBER_OF_CHANNELS_ 16
 
+#define _NUMBER_OF_DETECTORS 7
+const int kX   = 0;
+const int kdE  = 1;
+const int kS1J = 2;
+const int kS3J = 3;
+const int kS3O = 4;
+const int kSC  = 5;
+const int kFC  = 6;
+
 #include "TClonesArray.h"
 #include "TString.h"
 #include "TFile.h"
@@ -41,18 +50,11 @@ class Analysis
     Analysis();
     ~Analysis() {}
 
-  // general
-  public:
-    int  GetModuleIndex(int module); ///< Get module index from real module number 
-    int  GetGlobalID(UShort_t module, UShort_t channel);
-    void GetModCh(int globalID, UShort_t &module, UShort_t &channel);
-    double GetCalibratedEnergy(int module, int channelID, int adc);
-
   // conversion
   public:
     void RunConversion(int runNo, TString pathToInputFile);
     void SetConversionFile(TString fileName="");
-    void AddEnergyCalibration(TString name);
+    void AddAlphaCalibrationFile(TString name);
     void SetDrawOnline(Long64_t everyNEvents=10000) { fUpdateDrawingEveryNEvent = everyNEvents; }
     void SetSkipTSError(bool ignore=true) { fSkipTSError = ignore; }
     void SetStopAtTSError(bool stop) { fStopAtTSError = stop; }
@@ -75,7 +77,16 @@ class Analysis
     void ReadSummaryFile(TString fileName);
     void SetAlphaTestFile(TString fileName="");
     void AnalyzeAlphaTestModule(int module, bool drawHist=false, TString fileName="");
-    bool AnalyzeAlphaTest(int module, int channelID, bool drawHist=false, TVirtualPad* cvs=(TVirtualPad*)nullptr);
+    bool AnalyzeAlphaTest(int module, int mch, bool drawHist=false, TVirtualPad* cvs=(TVirtualPad*)nullptr);
+  // general
+  public:
+    int  GetModuleIndex(int module); ///< Get module index from real module number 
+    int  GetGlobalID(UShort_t module, UShort_t channel);
+    void GetModCh(int globalID, UShort_t &module, UShort_t &channel);
+    void DetectorToModule(int det, int dch, int &midx, int &mch);
+
+    TString GetDetectorTitle(int midx, int mch=0, bool addChannel=false);
+    double GetCalibratedEnergy(int module, int mch, int adc);
 
   public:
     int  GetDetectorType(int midx, int chid)    const { return fMapDetectorType[midx][chid]; }
@@ -84,7 +95,7 @@ class Analysis
     bool IsModuleReplaced(int midx, int chid)   const { return fMapDetectorReplaced[midx][chid]; }
     int  GetRFMod(int midx, int chid)           const { return fMapDetectorRFMod[midx][chid]; }
     int  GetRFMCh(int midx, int chid)           const { return fMapDetectorRFMCh[midx][chid]; }
-    int  GetModuleIndex(int module)             const { return fMapModuleToMIdx[module]; }
+    int  GetModuleIndex(int module)             const { return fMapFEToModuleIndex[module]; }
 
   private:
     void ConfigureDateTime();
@@ -203,23 +214,22 @@ class Analysis
   // mapping
   private:
     /// detector type
-    TString fDetectorName[_NUMBER_OF_MODULES_+1];
-    const int kDummyDetector = 0;
-    const int kS1Junction    = 1;
-    const int kS1Ohmic       = 2;
-    const int kS3Junction    = 3;
-    const int kS3Ohmic       = 4;
-    const int kdEDetector    = 5;
-    const int kScintillator  = 6;
-    const int kFaradayCup    = 7;
+    TString fDetectorName[_NUMBER_OF_DETECTORS];
+    const int fNumDetectors  = _NUMBER_OF_DETECTORS;
+    const int kDummyDetector = kX;
+    const int kdEDetector    = kdE;
+    const int kS1Junction    = kS1J;
+    const int kS3Junction    = kS3J;
+    const int kS3Ohmic       = kS3O;
+    const int kScintillator  = kSC;
+    const int kFaradayCup    = kFC;
 
-    const int fNumS1Junction   = 32;
-    const int fNumS1Ohmic      = 0; // 16
-    const int fNumS3Junction   = 24;
-    const int fNumS3Ohmic      = 32;
-    const int fNumdEDetector   = 11;
-    const int fNumScintillator = 1;
-    const int fNumFaradayCup   = 1;
+    //const int fNumS1Junction   = 32;
+    //const int fNumS3Junction   = 24;
+    //const int fNumS3Ohmic      = 32;
+    //const int fNumdEDetector   = 11;
+    //const int fNumScintillator = 1;
+    //const int fNumFaradayCup   = 1;
 
     int **fMapDetectorType;
     int **fMapDetectorChannel;
@@ -227,7 +237,11 @@ class Analysis
     int **fMapDetectorGroup;
     int **fMapDetectorRFMod;
     int **fMapDetectorRFMCh;
-    int fMapModuleToMIdx[20];
+    int fMapFEToModuleIndex[20];
+
+    int** fMapDetectorToGlobalID;
+    int* fMapGlobalIDToModuleIndex;
+    int* fMapGlobalIDToMCh;
 
   // drawing for data checking
   private:
