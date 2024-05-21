@@ -2,8 +2,9 @@
 [o] timestamp range > SetCoincidenceTSRange()
 [o] make de s1 calibration separately > AddEnergyCalibration()
 [o] de s1j swap > ...
-[?] de vs s1+de
 [o] trigger rate
-[ ] online check update file after reading
+[o] online check update file after reading
+[o] make flag file so to break from auto update > create file named "stop" to stop auto running program
+[?] de vs s1+de
 [ ] triton gate -> energy distribution
 [ ] excitation energy

@@ -2,14 +2,34 @@
 
 // Replace define value to "coutx" to omit printing
 #define coutd cout<<"+\033[0;36m"<<__LINE__<<" "<<__FILE__<<" #\033[0m "
+#define coutn cout<<"\033[0;36mNT\033[0m "
 #define couti cout<<"\033[0;32m==\033[0m "
 #define coutw cout<<"\033[0;33mWR\033[0m "
 #define coute cout<<"\033[0;31mER\033[0m "
 //#define coutt cout<<"\033[0;33mTSERROR\033[0m "
 #define coutt coutx
 
+//#define DEBUG_DATA_LINE
+//#define DEBUG_DATA_LINE_CONDITION
+//#define DEBUG_EVENT_LINE_CONDITION
+//#define DEBUG_EXIT_ANALYSIS
+
+//////////////////////////////////////////////////////////////////////////////
+Analysis *getAna() { return Analysis::GetAnalysis(); }
+void makeTCut(TString fileName="") { Analysis::MakeTritonCutFile(fileName); }
+void callTCut(TString fileName="") { Analysis::CallTritonCutFile(fileName); }
+//////////////////////////////////////////////////////////////////////////////
+
+Analysis* Analysis::fInstance = nullptr;
+Analysis* Analysis::GetAnalysis() {
+  if (fInstance !=nullptr)
+    return fInstance;
+  return new Analysis();
+} 
+
 Analysis::Analysis()
 {
+  fInstance = this;
   coutx.open("out/dummy_stream");
   InitializeAnalysis();
 }
@@ -113,6 +133,7 @@ void Analysis::InitializeAnalysis()
   fCountEvents = 0;
   fChannelArray = nullptr;
   fCountChannels = 0;
+  fCountAllLines = 0;
   fCountAllChannels = 0;
   fCountTSError = 0;
   fCoincidenceCount[0] = 0;
@@ -198,13 +219,14 @@ void Analysis::ReadSummaryFile(TString fileName)
   fTreeSummary -> SetBranchAddress("ts",&bTimeStamp);
   fTreeSummary -> SetBranchAddress("nch",&bNumChannels);
   fTreeSummary -> SetBranchAddress("de",&bdE);
-  fTreeSummary -> SetBranchAddress("ee",&bdES1);
+  fTreeSummary -> SetBranchAddress("ee",&bESum);
+  fTreeSummary -> SetBranchAddress("s3",&bE3);
   fTreeSummary -> SetBranchAddress("ch",&fChannelArray);
   fNumEventsSummary = fTreeSummary -> GetEntries();
 
   //fFileSummary -> ls();
-  //fRunNo = ((TParameter<int>*)fFileSummary->Get("run"))->GetVal();
-  fRunNo = TString(((TNamed*) fFileSummary->Get("run"))->GetTitle()).Atoi();
+  //fRunNo = ((TParameter<int>*)fFileSummary->Get("runNo"))->GetVal();
+  fRunNo = TString(((TNamed*) fFileSummary->Get("runNo"))->GetTitle()).Atoi();
   couti << fileName << "(" << fRunNo << ") containing " << fNumEventsSummary << " events" << endl;
 }
 
@@ -281,7 +303,7 @@ void Analysis::AnalyzeAlphaTestModule(int midx, bool drawAnalysis, TString fileN
 
   TCanvas* cvs = nullptr;
   if (drawAnalysis) {
-    cvs = new TCanvas(Form("cvs%d",midx),GetDetectorTitle(midx),1600,900);
+    cvs = new TCanvas(Form("cvs%d",midx),GetDetectorTitle(midx) + Form("  M(%d)",midx),1600,900);
     cvs -> Divide(4,4);
   }
   bool moduleDataExist = false;
@@ -323,7 +345,7 @@ bool Analysis::AnalyzeAlphaTest(int midx, int mch, bool drawAnalysis, TVirtualPa
   if (cvs==nullptr)
     isSingleDrawing = true;
 
-  auto detectorTitle = GetDetectorTitle(midx,mch,1);
+  auto detectorTitle = GetDetectorTitle(midx,mch,1) + Form(" M(%d,%d)",midx,mch);
   couti << detectorTitle << endl;
 
   auto gid = GetGlobalID(midx, mch);
@@ -440,102 +462,45 @@ void Analysis::InitializeDrawing()
   if (fFileOut!=nullptr)
     fFileOut -> cd();
 
-  int canvasMode = 3;
-
   if (fUpdateDrawingEveryNEvent>0)
   {
-    if (canvasMode==3) {
-      fCvsOnline1 = new TCanvas("cvsOnline",fRunName+" online update canvas 1",1800,800);
-      fCvsOnline1 -> SetMargin(0,0,0,0);
-      fCvsOnline1 -> Divide(3,2,0,0);
+    fCvsOnline1 = new TCanvas("cvsOnline",fRunName+" online update canvas 1",1800,800);
+    fCvsOnline1 -> SetMargin(0,0,0,0);
+    fCvsOnline1 -> Divide(3,2,0,0);
 
-      fPadTrgRate = fCvsOnline1 -> cd(1);
-      fPadEvtRate = fCvsOnline1 -> cd(1);
-                    fCvsOnline1 -> cd(2) -> Divide(1,2);
-      fPadTSDist1 = fCvsOnline1 -> cd(2) -> cd(1);
-      fPadTSDist2 = fCvsOnline1 -> cd(2) -> cd(2);
-      fPadChCount = fCvsOnline1 -> cd(3);
-      fPadADC     = fCvsOnline1 -> cd(5);
-      fPadEVSCh   = fCvsOnline1 -> cd(4);
-      fPaddEVSE   = fCvsOnline1 -> cd(6);
-      fPadEVSCh   -> SetLogz();
-      fPaddEVSE   -> SetLogz();
-    }
-    else if (canvasMode==1) {
-      fCvsOnline1 = new TCanvas("cvsOnline",fRunName+" online update canvas 1",1600,900);
-      fCvsOnline1 -> Divide(2,2);
-
-      fCvsOnline1 -> cd(1) -> Divide(2,2);
-      fPadTrgRate = fCvsOnline1 -> cd(1) -> cd(1);
-      fPadEvtRate = fCvsOnline1 -> cd(1) -> cd(2);
-      fPadTSDist1 = fCvsOnline1 -> cd(1) -> cd(3);
-      fPadTSDist2 = fCvsOnline1 -> cd(1) -> cd(4);
-
-      fCvsOnline1 -> cd(2) -> Divide(2,1);
-      fPadChCount = fCvsOnline1 -> cd(2) -> cd(1);
-      fPadADC     = fCvsOnline1 -> cd(2) -> cd(2);
-
-      fPadEVSCh   = fCvsOnline1 -> cd(3);
-      fPaddEVSE   = fCvsOnline1 -> cd(4);
-      fPadEVSCh   -> SetLogz();
-      fPaddEVSE   -> SetLogz();
-    }
-    else if (canvasMode==2) {
-      fCvsOnline1 = new TCanvas("cvsOnline",fRunName+" online update canvas 1",1600,900);
-      fCvsOnline1 -> Divide(2,2);
-
-      fCvsOnline1 -> cd(1) -> Divide(1,2);
-      fCvsOnline1 -> cd(1) -> cd(2) -> Divide(2,1);
-      fPadTrgRate = fCvsOnline1 -> cd(1) -> cd(1);
-      fPadEvtRate = fCvsOnline1 -> cd(1) -> cd(1);
-      fPadTSDist1 = fCvsOnline1 -> cd(1) -> cd(2) -> cd(1);
-      fPadTSDist2 = fCvsOnline1 -> cd(1) -> cd(2) -> cd(2);
-
-      fCvsOnline1 -> cd(2) -> Divide(2,1);
-      fPadChCount = fCvsOnline1 -> cd(2) -> cd(1);
-      fPadADC     = fCvsOnline1 -> cd(2) -> cd(2);
-
-      fPadEVSCh   = fCvsOnline1 -> cd(3);
-      fPaddEVSE   = fCvsOnline1 -> cd(4);
-      fPadEVSCh   -> SetLogz();
-      fPaddEVSE   -> SetLogz();
-    }
-    else {
-      fCvsOnline2 = new TCanvas("cvsTS",fRunName+" online update canvas 2",1600,900);
-      fCvsOnline2 -> Divide(2,2);
-      fPadTrgRate = fCvsOnline2 -> cd(1);
-      fPadEvtRate = fCvsOnline2 -> cd(2);
-      fPadTSDist1 = fCvsOnline2 -> cd(3);
-      fPadTSDist2 = fCvsOnline2 -> cd(4);
-
-      fCvsOnline1 = new TCanvas("cvsOnline",fRunName+" online update canvas 1",1600,900);
-      fCvsOnline1 -> Divide(2,2);
-      fPadChCount = fCvsOnline1 -> cd(1);
-      fPadADC     = fCvsOnline1 -> cd(2);
-      fPadEVSCh   = fCvsOnline1 -> cd(3);
-      fPaddEVSE   = fCvsOnline1 -> cd(4);
-      fPadEVSCh   -> SetLogz();
-      fPaddEVSE   -> SetLogz();
-    }
+    fCvsOnline1 -> cd(2) -> Divide(2,2,0,0);
+    fPadTSDist1 = fCvsOnline1 -> cd(2) -> cd(1);
+    fPadTSDist2 = fCvsOnline1 -> cd(2) -> cd(2);
+    fPadTrgRate = fCvsOnline1 -> cd(2) -> cd(3);
+    fPadEvtRate = fCvsOnline1 -> cd(2) -> cd(4);
+    fPadEx      = fCvsOnline1 -> cd(3);
+    fPadChCount = fCvsOnline1 -> cd(1);
+    fPadADC     = fCvsOnline1 -> cd(5);
+    fPadEVSCh   = fCvsOnline1 -> cd(4);
+    fPaddEVSE   = fCvsOnline1 -> cd(6);
+    fPadEVSCh   -> SetLogz();
+    fPaddEVSE   -> SetLogz();
   }
 
-  fHistTriggerRate      = new TH1D("histTrgRateG","Trigger*NCh rate;trigger/s;count",fNumRate,0,fMaxRate);
+  fHistTriggerRate      = new TH1D("histTrgRateG",";nch*trigger/s;count",fNumRate,0,fMaxRate);
   fHistTriggerRateError = new TH1D("histTrgRateE","Bad trigger rate;trigger/s;count",fNumRate,0,fMaxRate);
   fHistTriggerRateError -> SetLineStyle(2);
   //fHistTriggerRate      -> SetFillColor(kGray);
   fHistTriggerRate      -> SetLineColor(kBlack);
   fHistTriggerRateError -> SetLineColor(kBlack);
 
-  fHistEventRate      = new TH1D("histEvtRateG","Event rate;event/s;count",fNumRate,0,fMaxRate);
+  fHistEventRate      = new TH1D("histEvtRateG",";event/s;count",fNumRate,0,fMaxRate);
   fHistEventRateError = new TH1D("histEvtRateE","Bad event rate;event/s;count",fNumRate,0,fMaxRate);
   fHistEventRateError -> SetLineStyle(2);
   fHistEventRate      -> SetFillColor(29);
   fHistEventRate      -> SetLineColor(kBlue);
   fHistEventRateError -> SetLineColor(kBlue);
+  //fHistEventRate      -> SetStats(0);
 
   if (fPadTrgRate==fPadEvtRate) {
-    fHistTriggerRate -> SetTitle("Trigger*NCh (black) / Event (blue) rate;trigger/s;count");
+    //fHistTriggerRate -> SetTitle("Trigger*NCh (black) / Event (blue) rate;trigger/s;count");
     fHistEventRate -> SetTitle("Trigger*NCh (black) / Event (blue) rate;trigger/s;count");
+    //fHistEventRate -> SetTitle(";Trigger*NCh/s (black) / Event/s (blue);count");
   }
 
   //fHistTSDist1 = new TH1D("histTSDist1","TS distance (+);TS-dist;count", 20,-1,20);
@@ -550,64 +515,36 @@ void Analysis::InitializeDrawing()
 
   fHistADC = new TH1D("histADC","ADC (all channels);ADC",fNumADC,0,fMaxADC);
   fHistADC -> SetFillColor(29);
-  fHistE = new TH1D("histEnergy","Energy (all channels);energy (MeV)",fNumE,0,fMaxE);
+  fHistE = new TH1D("histEnergy",";energy (MeV)",fNumE,0,fMaxE);
   fHistE -> SetFillColor(29);
 
   fHistAVSCh = new TH2D("histAVSCh", "ADC vs module-ch;;ADC", fNumCh,0,fNumCh,fNumADC,0,fMaxADC);
-  fHistEVSCh = new TH2D("histEVSCh", "Energy vs module-ch;;energy (MeV)", fNumCh,0,fNumCh,fNumE,0,fMaxE);
+  fHistEVSCh = new TH2D("histEVSCh", ";;energy (MeV)", fNumCh,0,fNumCh,fNumE,0,fMaxE);
   fHistdAVSA = new TH2D("histdAVSA", "dA vs dA + S1;dA + S1A;dA", fNumADC, 0, 2*fMaxADC, fNumADC, 0, fMaxADC);
-  fHistdEVSE = new TH2D("histdEVSE", "dE vs dE + S1;dE + S1E (MeV);dE (MeV)", fNumE,0,fMaxE+fMaxdE, fNumdE, 0, fMaxdE);
+  fHistdEVSE = new TH2D("histdEVSE", ";dE + S1E (MeV);dE (MeV)", fNumE,0,fMaxE+fMaxdE, fNumdE, 0, fMaxdE);
   fHistAVSCh -> SetStats(0);
   fHistEVSCh -> SetStats(0);
   fHistdAVSA -> SetStats(0);
   fHistdEVSE -> SetStats(0);
 
+  fHistEx = new TH1D("histEx",";Cr excitation energy;count",fNumEx,0,fMaxEx);
+  fHistEx -> SetFillColor(29);
+
   if (fUpdateDrawingEveryNEvent>0) {
-    if (canvasMode==3) {
-      SetAttribute(fHistTriggerRate,fPadTrgRate,1);
-      SetAttribute(fHistTriggerRateError,fPadTrgRate,1);
-      SetAttribute(fHistEventRate,fPadEvtRate,1);
-      SetAttribute(fHistEventRateError,fPadEvtRate,1);
-      SetAttribute(fHistTSDist1,fPadTSDist1,16);
-      SetAttribute(fHistTSDist2,fPadTSDist2,16);
-      SetAttribute(fHistChCount,fPadChCount);
-      SetAttribute(fHistADC,fPadADC);
-      SetAttribute(fHistE,fPadADC);
-      SetAttribute(fHistAVSCh,fPadEVSCh,1,true);
-      SetAttribute(fHistEVSCh,fPadEVSCh,1,true);
-      SetAttribute(fHistdAVSA,fPaddEVSE,1,true);
-      SetAttribute(fHistdEVSE,fPaddEVSE,1,true);
-    }
-    else if (canvasMode==1||canvasMode==2) {
-      SetAttribute(fHistTriggerRate,fPadTrgRate,16);
-      SetAttribute(fHistTriggerRateError,fPadTrgRate,16);
-      SetAttribute(fHistEventRate,fPadEvtRate,16);
-      SetAttribute(fHistEventRateError,fPadEvtRate,16);
-      SetAttribute(fHistTSDist1,fPadTSDist1,16);
-      SetAttribute(fHistTSDist2,fPadTSDist2,16);
-      SetAttribute(fHistChCount,fPadChCount);
-      SetAttribute(fHistADC,fPadADC);
-      SetAttribute(fHistE,fPadADC);
-      SetAttribute(fHistAVSCh,fPadEVSCh,1,true);
-      SetAttribute(fHistEVSCh,fPadEVSCh,1,true);
-      SetAttribute(fHistdAVSA,fPaddEVSE,1,true);
-      SetAttribute(fHistdEVSE,fPaddEVSE,1,true);
-    }
-    else {
-      SetAttribute(fHistTriggerRate,fPadTrgRate,2);
-      SetAttribute(fHistTriggerRateError,fPadTrgRate,2);
-      SetAttribute(fHistEventRate,fPadEvtRate,2);
-      SetAttribute(fHistEventRateError,fPadEvtRate,2);
-      SetAttribute(fHistTSDist1,fPadTSDist1,2);
-      SetAttribute(fHistTSDist2,fPadTSDist2,2);
-      SetAttribute(fHistChCount,fPadChCount);
-      SetAttribute(fHistADC,fPadADC);
-      SetAttribute(fHistE,fPadADC);
-      SetAttribute(fHistAVSCh,fPadEVSCh,1,true);
-      SetAttribute(fHistEVSCh,fPadEVSCh,1,true);
-      SetAttribute(fHistdAVSA,fPaddEVSE,1,true);
-      SetAttribute(fHistdEVSE,fPaddEVSE,1,true);
-    }
+    SetAttribute(fHistTriggerRate,fPadTrgRate,16);
+    SetAttribute(fHistTriggerRateError,fPadTrgRate,16);
+    SetAttribute(fHistEventRate,fPadEvtRate,16);
+    SetAttribute(fHistEventRateError,fPadEvtRate,16);
+    SetAttribute(fHistTSDist1,fPadTSDist1,16);
+    SetAttribute(fHistTSDist2,fPadTSDist2,16);
+    SetAttribute(fHistChCount,fPadChCount);
+    SetAttribute(fHistEx,fPadEx);
+    SetAttribute(fHistADC,fPadADC);
+    SetAttribute(fHistE,fPadADC);
+    SetAttribute(fHistAVSCh,fPadEVSCh,1,true);
+    SetAttribute(fHistEVSCh,fPadEVSCh,1,true);
+    SetAttribute(fHistdAVSA,fPaddEVSE,1,true);
+    SetAttribute(fHistdEVSE,fPaddEVSE,1,true);
   }
 
   //auto TakeCareOfLabels = [this](TH1* hist)
@@ -715,7 +652,7 @@ void Analysis::ConfigureDateTime()
 void Analysis::WriteRunParameters(TFile* file, int option)
 {
   file -> cd();
-  (new TNamed("run", Form("%d",fRunNo))) -> Write();
+  (new TNamed("runNo", Form("%d",fRunNo))) -> Write();
   if (option==0) {
     (new TNamed("Draw every n-event   :", Form("%d",fUpdateDrawingEveryNEvent))) -> Write();
     (new TNamed("Return if no file    :", Form("%d",fReturnIfNoFile))) -> Write();
@@ -725,8 +662,13 @@ void Analysis::WriteRunParameters(TFile* file, int option)
     (new TNamed("File number range    :", Form("%d %d",fFileNumberRange1,fFileNumberRange2))) -> Write();
     (new TNamed("ADC Threshold        :", Form("%d",fADCThreshold))) -> Write();
     (new TNamed("Coincidence dTS cut  :", Form("%d",fCoincidenceTSRange))) -> Write();
-    (new TNamed("Coincidence mult cut :", Form("%d",fCoincidenceMultCut))) -> Write();
+    (new TNamed("Coincidence mult rng :", Form("%d %d",fCoincidenceMultRange1,fCoincidenceMultRange2))) -> Write();
     (new TNamed("dES1 Coincidence mode:", Form("%d",fdES1CoincidenceMode))) -> Write();
+    (new TNamed("dE13 Coincidence mode:", Form("%d",fdES1S3CoincidenceMode))) -> Write();
+    if (fTritonCutG!=nullptr) {
+      auto tritonCutGCopy = (TCutG*) fTritonCutG -> Clone("tritonCutGCopy");
+      tritonCutGCopy -> Write();
+    }
   }
 }
 
@@ -748,7 +690,8 @@ void Analysis::SetConversionFile(TString fileName)
   fTreeOut -> Branch("ts",&bTimeStamp);
   fTreeOut -> Branch("nch",&bNumChannels);
   fTreeOut -> Branch("de",&bdE);
-  fTreeOut -> Branch("ee",&bdES1);
+  fTreeOut -> Branch("ee",&bESum);
+  fTreeOut -> Branch("s3",&bE3);
   fTreeOut -> Branch("ch",&fChannelArray);
 
   WriteRunParameters(fFileOut,0);
@@ -756,88 +699,20 @@ void Analysis::SetConversionFile(TString fileName)
 
 void Analysis::ReadDataFile()
 {
-  ifstream fileIn;
-  streamsize fileSize;
-  streamsize fileSizeOld = 0; // Size of opened Raw-Data file
-  const streamsize fileSizeMax = 500000000; // 500 MB
-  UShort_t countInputs = fFileNumberRange1; // Number of Files read
-  UShort_t FENumber, mch, adc;
-  Long64_t timeStampLocal, timeStamp;
-  Int_t tsGroup;
+  fDataFileNumber = fFileNumberRange1; // Number of Files read
+  UShort_t FENumber, mch, adc, tsGroup;
+  Long64_t tsLocal, timeStamp;
   Int_t numData = 0;
   char buffer[256];
-  int countOpenFileTrials = 0;
+  //int countOpenFileTrials = 0;
 
   ChannelData* channelData = NULL;
   fTimeStampPrev = -1;
 
-  while(1)
+  while (true)
   {
-    if (fFileNumberMax >=0 && countInputs>fFileNumberMax) {
-      couti << "Number of inputs " << countInputs << " exceed maximum input number " << fFileNumberMax << endl;
-      break;
-    }
-
-    TString fileNameInput = TString::Format("%s/RUN%03d_%s_list_%03d.dat", fPathToInput.Data(),fRunNo,fDateTime.Data(),countInputs);
-    cout << endl;
-    couti << "Reading " << fileNameInput << endl;
-
-    countOpenFileTrials = 0;
-    while (1)
-    {
-      fileIn.open(fileNameInput);
-      if (fileIn.fail())
-      {
-        fileIn.close();
-        if (countOpenFileTrials>10) {
-          coute << "Failed to open file!" << endl;
-          break;
-        }
-        else {
-          countOpenFileTrials++;
-          coutw << "There is no file!" << endl;
-          if (fReturnIfNoFile)
-            break;
-          couti << "waiting(" << countOpenFileTrials << ") 3s ..." << endl;
-          sleep(3);
-          continue;
-        }
-      }
-
-      fileSize = fileIn.seekg(0, ios::end).tellg(); // obtain the size of file
-      fileIn.seekg(0, ios::beg); // rewind
-
-      if (fileSize>fileSizeMax || (countOpenFileTrials!=0 && fileSize==fileSizeOld)) // good file or final file
-      {
-        countOpenFileTrials = 0;
-        countInputs++;
-        break;
-      }
-      else if(countOpenFileTrials==0){ // first try
-        countOpenFileTrials++;
-        fileIn.close();
-        fileSizeOld = fileSize;
-        if (fFirstFileOpened) {
-          couti << "waiting(" << countOpenFileTrials << ") 3s ..." << endl;
-          sleep(3);
-        }
-        fFirstFileOpened = true;
-      }
-      else if(fileSize > fileSizeOld){ // writing the file is still continued ...
-        if (fIgnoreFileUpdate)
-          break;
-        fileIn.close();
-        fileSizeOld = fileSize;
-        couti << "waiting(" << countOpenFileTrials << ") 60s ..." << endl;
-        sleep(60);
-      }
-    }
-
-    if (countOpenFileTrials != 0) {
-      coutw << fileNameInput << " is not found! exit." << endl;
-      break;
-    }
-
+    //if (CheckOpenFileStatus1()==false) break;
+    if (CheckOpenFileStatus2()==false) break;
 
     fChannelArray -> Clear("C");
     Long64_t countEventsSingleFile = 0;
@@ -845,28 +720,34 @@ void Analysis::ReadDataFile()
     Long64_t countLine = 0;
     fdEArrayIdx.clear();
     fS1ArrayIdx.clear();
+    fS3ArrayIdx.clear();
     fdEADC = 0.;
     fS1ADC = 0.;
-    while (fileIn >> buffer)
+    fS3ADC = 0.;
+
+    while (fDataFile >> buffer)
     {
+      fLastDataPos = fDataFile.tellg();
+
       countLine++;
-      numData = (Int_t) sscanf(buffer, "%hu,%hu,%hu,%lld,%hu", &FENumber, &mch, &adc, &timeStampLocal, &tsGroup);
+      numData = (Int_t) sscanf(buffer, "%hu,%hu,%hu,%lld,%hu", &FENumber, &mch, &adc, &tsLocal, &tsGroup);
       if (numData != 5) {
-        coute << TString::Format("Number of data in line is not 5 (%d) %u %u %u %lld %u", numData, FENumber, mch, adc, timeStampLocal, tsGroup) << endl;
+        coute << Form("Number of data in line is not 5 (%d)!",numData) << endl;
+        coute << FENumber<<" "<<mch<<" "<<adc<<" "<<tsLocal<<" "<<tsGroup << endl;
         continue;
       }
+#ifdef DEBUG_DATA_LINE
+      coutd << fCountAskContinueRun << endl;
+      if (fCountAskContinueRun==1) coutd << FENumber<<" "<<mch<<" "<<adc<<" "<<tsLocal<<" "<<tsGroup << endl;
+#endif
 
-      timeStamp = timeStampLocal;
-      if (tsGroup>0)
-        timeStamp += (Long64_t)(tsGroup) * 0xFFFFFFFFFF; 
+      timeStamp = tsLocal;
+      if (tsGroup>0) timeStamp += (Long64_t)(tsGroup) * 0xFFFFFFFFFF; 
 
       if (bTimeStamp>=0) {
         int dts = int(timeStamp)- int(fTimeStampPrevTrue);
         if (dts>=0) fHistTSDist1 -> Fill(dts);
-        else {
-          //fHistTSDist1 -> Fill(-0.5);
-          fHistTSDist2 -> Fill(dts);
-        }
+        else { fHistTSDist2 -> Fill(dts); }
       }
 
       int eventStatus = kNextEvent;
@@ -920,7 +801,8 @@ void Analysis::ReadDataFile()
         bool eventIsFilled = true;
         if (countEventsSingleFile>0) {
           eventIsFilled = FillDataTree();
-          AskUpdateDrawing();
+          if (UpdateDrawing()==false)
+            break;
         }
         if (fExitAnalysis)
           break;
@@ -961,12 +843,15 @@ void Analysis::ReadDataFile()
           energy = GetCalibratedEnergy(midx,mch,adc);
       auto det = fMapDetectorType[midx][mch];
       auto dch = fMapDetectorChannel[midx][mch];
-      channelData -> SetData(midx,mch,det,dch,gid,adc,energy,timeStampLocal,tsGroup,timeStamp);
+      channelData -> SetData(midx,mch,det,dch,gid,adc,energy,tsLocal,tsGroup,timeStamp);
       fCountAllChannels++;
 
-
-      if (fdES1CoincidenceMode)
+      if (fdES1CoincidenceMode || fdES1S3CoincidenceMode)
       {
+        if (fMapDetectorType[midx][mch]==kS3Junction) {
+          fS3ArrayIdx.push_back(fCountChannels-1);
+          fS3ADC = adc;
+        }
         if (fMapDetectorType[midx][mch]==kS1Junction) {
           fS1ArrayIdx.push_back(fCountChannels-1);
           fS1ADC = adc;
@@ -990,6 +875,9 @@ void Analysis::ReadDataFile()
 
       if (fEventCountLimit>0 && fCountEvents>=fEventCountLimit) {
         couti << "Event count limit at " << fCountEvents << "!" << endl;
+#ifdef DEBUG_EXIT_ANALYSIS
+        coutn << "Exit ana: " << "Event count limit at " << fCountEvents << "!" << endl;
+#endif
         fExitAnalysis = true;
       }
     }
@@ -1000,20 +888,175 @@ void Analysis::ReadDataFile()
     if (fExitAnalysis)
       break;
 
-    couti << "Number of events from last file: " << countEventsSingleFile << endl;
+    couti << "End of file!" << endl;
+    couti << "Number of events from current file: " << countEventsSingleFile << endl;
 
     PrintConversionSummary();
 
-    fileIn.close();
   }
+  if (fDataFile.is_open())
+    fDataFile.close();
 
   UpdateCvsOnline();
 }
 
+bool Analysis::CheckOpenFileStatus2()
+{
+  if (!fInputFileName.IsNull() && fDataFile.is_open())
+  {
+    fLastDataFileSize = GetFileSize(fInputFileName);
+    if (!fIgnoreFileUpdate)
+       if (AskContinueRun("Waiting for possible update of the data file")==false) // after waiting here
+          return false;
+
+    Long64_t currentDataFileSize = GetFileSize(fInputFileName);
+    if (currentDataFileSize>fLastDataFileSize) {
+      couti << fInputFileName << " size increased by " << currentDataFileSize - fLastDataFileSize << endl;
+      fDataFile.clear();
+      fDataFile.seekg(fLastDataPos);
+      return true;
+    }
+    else {
+      couti << "No update! Closing file" << endl;
+      fDataFile.close(); // and continue;
+    }
+  }
+
+  {
+    if (fFileNumberMax >=0 && fDataFileNumber>fFileNumberMax) {
+      couti << "File number " << fDataFileNumber << " exceeded maximum " << fFileNumberMax << endl;
+      return false;
+    }
+    fInputFileName = Form("%s/RUN%03d_%s_list_%03d.dat",
+        fPathToInput.Data(),fRunNo,fDateTime.Data(),fDataFileNumber);
+    fDataFileNumber++;
+
+    cout << endl;
+    couti << "Reading " << fInputFileName << endl;
+
+    bool waitedForFileUpdate = false;
+    bool firstLoop = true;
+
+    while (true)
+    {
+      if (firstLoop)
+        firstLoop = false;
+      else {
+        if (AskContinueRun("Wait for the new file?")==false)
+          return false;
+      }
+
+      if (fExitAnalysis)
+        return false;
+
+      fDataFile.open(fInputFileName);
+      if (fDataFile.fail())
+      {
+        fDataFile.close();
+        if (waitedForFileUpdate) {
+          coute << "Failed to open file!" << endl;
+          return false;
+        }
+        else {
+          coutw << "There is no file!" << endl;
+          if (fReturnIfNoFile)
+            return false;
+          waitedForFileUpdate = true;
+          continue;
+        }
+      }
+
+      //couti << "Good!" << endl;
+      break;
+    }
+  }
+
+  return true;
+}
+
+bool Analysis::CheckOpenFileStatus1()
+{
+  if (fFileNumberMax >=0 && fDataFileNumber>fFileNumberMax) {
+    couti << "Number of inputs " << fDataFileNumber << " exceeded maximum file number " << fFileNumberMax << endl;
+    return false;
+  }
+  fInputFileName = Form("%s/RUN%03d_%s_list_%03d.dat",
+      fPathToInput.Data(),fRunNo,fDateTime.Data(),fDataFileNumber);
+  fDataFileNumber++;
+
+  cout << endl;
+  couti << "Reading " << fInputFileName << endl;
+
+  int countOpenFileTrials = 0;
+  while (true)
+  {
+    fDataFile.open(fInputFileName);
+    if (fDataFile.fail())
+    {
+      fDataFile.close();
+      if (countOpenFileTrials>10) {
+        coute << "Failed to open file!" << endl;
+        break;
+      }
+      else {
+        countOpenFileTrials++;
+        coutw << "There is no file!" << endl;
+        if (fReturnIfNoFile)
+          break;
+        couti << "waiting(" << countOpenFileTrials << ") 3s ..." << endl;
+        sleep(3);
+        continue;
+      }
+    }
+
+    //couti << "Good!" << endl;
+
+    fDataFileSize = fDataFile.seekg(0, ios::end).tellg(); // obtain the size of file
+    fDataFile.seekg(0, ios::beg); // rewind
+
+    if (fDataFileSize>fDataFileSizeReadMax || (countOpenFileTrials!=0 && fDataFileSize==fDataFileSizeOld))
+    {
+      // let's read file!
+      countOpenFileTrials = 0;
+      break;
+    }
+    else if(countOpenFileTrials==0){ // first try
+      countOpenFileTrials++;
+      fDataFile.close();
+      fDataFileSizeOld = fDataFileSize;
+      if (fFirstFileOpened) {
+        couti << "waiting(" << countOpenFileTrials << ") 3s ..." << endl;
+        sleep(3);
+      }
+      fFirstFileOpened = true;
+    }
+    else if(fDataFileSize > fDataFileSizeOld){ // writing the file is still continued ...
+      if (fIgnoreFileUpdate)
+        break;
+      fDataFile.close();
+      fDataFileSizeOld = fDataFileSize;
+      couti << "waiting(" << countOpenFileTrials << ") 60s ..." << endl;
+      sleep(60);
+    }
+  }
+
+  if (countOpenFileTrials != 0) {
+    coutw << fInputFileName << " is not found! exit." << endl;
+    return false;
+  }
+
+  return true;
+}
+
 bool Analysis::CheckDataLineCondition(double adc, int eventStatus, Long64_t timeStamp)
 {
-  if (adc < fADCThreshold)
+  fCountAllLines++;
+  if (adc < fADCThreshold) {
+#ifdef DEBUG_DATA_LINE_CONDITION
+    if (fCountAskContinueRun==1) coutd << "Bad data: " << adc << " < " << fADCThreshold << endl;
+#endif
     return false;
+  }
 
   if (eventStatus==kTSError) // time-stamp decreased
   {
@@ -1024,19 +1067,41 @@ bool Analysis::CheckDataLineCondition(double adc, int eventStatus, Long64_t time
     }
     if (fStopAtTSError) {
       coute << "Exit due to Time-stamp error (" << fCountTSError << ") " << fTimeStampPrev << " -> " << timeStamp << endl;
+#ifdef DEBUG_EXIT_ANALYSIS
+        coutn << "Exit ana: " << "Exit due to Time-stamp error (" << fCountTSError << ") " << fTimeStampPrev << " -> " << timeStamp << endl;
+#endif
       fExitAnalysis = true;
     }
+#ifdef DEBUG_DATA_LINE_CONDITION
+    if (fCountAskContinueRun==1) coutd << "Bad data: " << "TS-Error!" << endl;
+#endif
     return false;
   }
+#ifdef DEBUG_DATA_LINE_CONDITION
+  if (fCountAskContinueRun==1) coutd << "Good data" << endl;
+#endif
 
   return true;
 }
 
-bool Analysis::CheckEventCondition()
+bool Analysis::CheckEventCondition(double de, double ee)
 {
-  if (fCoincidenceMultCut>0)
-    if (fCountChannels!=fCoincidenceMultCut)
+  if (!fGoodCoincidenceEvent)
+    return false;
+  fGoodCoincidenceEvent = false;
+
+  if (fTritonCutGIsSet)
+  {
+    if (fTritonCutG->IsInside(ee,de))
+      return true;
+    else {
+#ifdef DEBUG_EVENT_LINE_CONDITION
+      coutd << "Bad event: (" << ee << ", " << de << ") is outside of triton cut" << endl;
+#endif
       return false;
+    }
+  }
+
   return true;
 }
 
@@ -1048,34 +1113,78 @@ bool Analysis::FillDataTree()
   else if (fCountChannels==3) fCoincidenceCount[3]++;
   else if (fCountChannels>=4) fCoincidenceCount[4]++;
 
-  if (1) // if there is coincidence between S1 and dE-detector
-  {
-    bdE = -1;
-    bdES1 = -1;
-    if (fdES1CoincidenceMode)
-    {
-      if (fdEArrayIdx.size()==1 && fS1ArrayIdx.size()==1)
-      {
-        auto chdE = (ChannelData*) fChannelArray -> At(fdEArrayIdx[0]);
-        auto chS1 = (ChannelData*) fChannelArray -> At(fS1ArrayIdx[0]);
-        int groupdE = fMapDetectorGroup[chdE->midx][chdE->mch];
-        int groupS1 = fMapDetectorGroup[chS1->midx][chS1->mch];
-        bdE = chdE->energy;
-        bdES1 = chdE->energy + chS1->energy;
-        if (groupdE==groupS1) {
-          fHistdAVSA -> Fill(chdE->adc,    chdE->adc    + chS1->adc);
-          fHistdEVSE -> Fill(chdE->energy, chdE->energy + chS1->energy);
-        }
-      }
-      fdEArrayIdx.clear();
-      fS1ArrayIdx.clear();
-      fdEADC = 0.;
-      fS1ADC = 0.;
+  //coutd << fdES1CoincidenceMode << " " << fdES1S3CoincidenceMode << " " << fCoincidenceMultRange1 << endl;
+  if (fdES1CoincidenceMode) {
+    if (fdEArrayIdx.size()==1 && fS1ArrayIdx.size()==1)
+      fGoodCoincidenceEvent = true;
+    else {
+#ifdef DEBUG_EVENT_LINE_CONDITION
+      coutd << "Bad event: " << fdEArrayIdx.size() << " " << fS1ArrayIdx.size() << endl;
+#endif
+      fGoodCoincidenceEvent = false;
     }
   }
+  else if (fdES1S3CoincidenceMode) {
+    if (fdEArrayIdx.size()==1 && fS1ArrayIdx.size()==1 && fS3ArrayIdx.size()==1 )
+      fGoodCoincidenceEvent = true;
+    else {
+#ifdef DEBUG_EVENT_LINE_CONDITION
+      coutd << "Bad event: " << fdEArrayIdx.size() << " " << fS1ArrayIdx.size() << " " << fS3ArrayIdx.size() << endl;
+#endif
+      fGoodCoincidenceEvent = false;
+    }
+  }
+  else if (fCoincidenceMultRange1>0) {
+    if (fCountChannels>=fCoincidenceMultRange1 && fCountChannels<=fCoincidenceMultRange2)
+      fGoodCoincidenceEvent = true;
+    else {
+#ifdef DEBUG_EVENT_LINE_CONDITION
+      coutd << "Bad event: mult " << fCountChannels << " not in range " << fCoincidenceMultRange1 << " - " << fCoincidenceMultRange2 << endl;
+#endif
+      fGoodCoincidenceEvent = false;
+    }
+  }
+  else
+    fGoodCoincidenceEvent = true;
 
-  if (CheckEventCondition()==false)
+  bdE = -1;
+  bESum = -1;
+  bE3 = -1;
+  if ((fdES1CoincidenceMode || fdES1CoincidenceMode) && fGoodCoincidenceEvent)
+  {
+    auto chdE = (ChannelData*) fChannelArray -> At(fdEArrayIdx[0]);
+    auto chS1 = (ChannelData*) fChannelArray -> At(fS1ArrayIdx[0]);
+    int groupdE = fMapDetectorGroup[chdE->midx][chdE->mch];
+    int groupS1 = fMapDetectorGroup[chS1->midx][chS1->mch];
+    bdE = chdE->energy;
+    bESum = chdE->energy + chS1->energy;
+    if (groupdE==groupS1) {
+      fHistdAVSA -> Fill(chdE->adc,    chdE->adc    + chS1->adc);
+      fHistdEVSE -> Fill(chdE->energy, chdE->energy + chS1->energy);
+    }
+    if (fS3ArrayIdx.size()==1)
+    {
+      auto chS3 = (ChannelData*) fChannelArray -> At(fS3ArrayIdx[0]);
+      int groupS3 = fMapDetectorGroup[chS3->midx][chS3->mch];
+      bE3 = chdE->energy + chS3->energy;
+    }
+    fdEArrayIdx.clear();
+    fS1ArrayIdx.clear();
+    fS3ArrayIdx.clear();
+    fdEADC = 0.;
+    fS1ADC = 0.;
+    fS3ADC = 0.;
+  }
+
+  if (CheckEventCondition(bdE, bESum)==false)
     return false;
+
+  if (fTritonCutGIsSet)
+  {
+    //auto detectorTheta;
+    //auto ex = EvalEx(fBeamEnergy, bESum, detectorTheta);
+    //fHistEx -> Fill(ex);
+  }
 
   bTimeStamp = fTimeStampPrev;
   bNumChannels = fCountChannels;
@@ -1084,7 +1193,93 @@ bool Analysis::FillDataTree()
   return true;
 }
 
-void Analysis::AskUpdateDrawing()
+Long64_t Analysis::GetFileSize(TString fileName)
+{
+  std::ifstream file(fileName,std::ios::binary | std::ios::ate);
+  Long64_t fileSize = file.tellg();
+  file.close();
+  return fileSize;
+}
+
+bool Analysis::AskContinueRun(TString message)
+{
+  fCountAskContinueRun++;
+
+  std::string userInput0;
+  if (fAutoUpdateRun) {
+    if (CheckStopFile())
+      userInput0 = "stop";
+    else
+      userInput0 = "wait";
+  }
+  else {
+    if (!message.IsNull()) couti << message << endl;
+    cout << "\033[0;32m" << Form("== (%d) Enter / stop / auto / wait: ",fCountEvents) << "\033[0m";
+    std::getline(std::cin, userInput0);
+  }
+  TString userInput = userInput0;
+  userInput.ToLower();
+
+  if (userInput=="stop" || userInput=="exit" || userInput=="x") {
+#ifdef DEBUG_EXIT_ANALYSIS
+    coutn << "Exit ana: " << "user input " << userInput << endl;
+#endif
+    fExitAnalysis = true;
+    return false;
+  }
+  else if (userInput.Index(".qqq")==0 || userInput=="qqq") {
+    gApplication -> Terminate();
+  }
+  else if (userInput.Index(".q")==0 || userInput=="q") {
+#ifdef DEBUG_EXIT_ANALYSIS
+    coutn << "Exit ana: " << "user input " << userInput << endl;
+#endif
+    fExitAnalysis = true;
+    fExitRoot = true;
+    return false;
+  }
+  else
+  {
+    if (userInput=="auto")
+    {
+      fAutoUpdateRun = true;
+      couti << "automatically update after waiting " << fUpdateAfterXSec << " s" << endl;
+    }
+    if (userInput=="wait")
+    {
+      //fUpdateAfterXSec = 0;
+      //couti << "Reading all events" << endl;
+    }
+    if (userInput.IsDec() && userInput.Atoi()>0)
+    {
+      fUpdateAfterXSec = userInput.Atoi();
+      couti << Form("Waiting next %d seconds",fUpdateAfterXSec) << endl;
+    }
+
+    int nn = 1;
+    if      (fUpdateAfterXSec>1000) nn = 1000;
+    else if (fUpdateAfterXSec>100) nn = 100;
+    else if (fUpdateAfterXSec>10) nn = 10;
+    else if (fUpdateAfterXSec>0) nn = 1;
+
+    for (int sec=0; sec<fUpdateAfterXSec; ++sec)
+    {
+      if (sec%nn==0) {
+        if (sec>0) {
+          cout << "\r";
+          cout << "                        ";
+          cout << "\r";
+        }
+        cout << "   Waiting ... " << sec << std::flush;
+      }
+      sleep(1);
+    }
+    cout << endl;
+  }
+  return true;
+}
+
+bool Analysis::UpdateDrawing()
 {
   if (fUpdateDrawingEveryNEvent>=0)
   {
@@ -1094,42 +1289,70 @@ void Analysis::AskUpdateDrawing()
     if (fUpdateDrawingEveryNEvent!=0 && fCountEventsForUpdate>=fUpdateDrawingEveryNEvent)
     {
       UpdateCvsOnline();
-      fCountEventsForUpdate = 0;
-      std::string userInput0;
-      if (fAutoUpdateDrawing)
-        userInput0 = "";
-      else {
-        cout << "\033[0;32m" << Form("== (%d) Enter / stop / auto / all: ",fCountEvents,fUpdateDrawingEveryNEvent) << "\033[0m";
-        std::getline(std::cin, userInput0);
-      }
-      TString userInput = userInput0;
-      userInput.ToLower();
-      if (userInput=="stop" || userInput=="exit" || userInput=="x")
-        fExitAnalysis = true;
-      else if (userInput.Index(".q")==0 || userInput=="q") {
-        fExitAnalysis = true;
-        fExitRoot = true;
-      }
-      else
-      {
-        if (userInput=="auto")
-        {
-          fAutoUpdateDrawing = true;
-          couti << Form("automatically update every %d events",fUpdateDrawingEveryNEvent) << endl;
-        }
-        if (userInput=="all")
-        {
-          fUpdateDrawingEveryNEvent = 0;
-          couti << "Reading all events" << endl;
-        }
-        if (userInput.IsDec() && userInput.Atoi()>0)
-        {
-          fUpdateDrawingEveryNEvent = userInput.Atoi();
-          couti << Form("Reading next %d events",fUpdateDrawingEveryNEvent) << endl;
-        }
-      }
+      if (AskUpdateDrawing("Continue update drawing?")==false)
+        return false;
     }
   }
+  return true;
+}
+
+bool Analysis::AskUpdateDrawing(TString message)
+{
+  fCountEventsForUpdate = 0;
+  std::string userInput0;
+  if (fAutoUpdateDrawing) {
+    if (CheckStopFile())
+      userInput0 = "stop";
+    else {
+      userInput0 = "";
+      couti << "Auto update drawing ..." << endl;
+    }
+  }
+  else {
+    if (!message.IsNull()) couti << message << endl;
+    cout << "\033[0;32m" << Form("== (%d) Enter / stop / auto / all: ",fCountEvents) << "\033[0m";
+    std::getline(std::cin, userInput0);
+  }
+  TString userInput = userInput0;
+  userInput.ToLower();
+  if (userInput=="stop" || userInput=="exit" || userInput=="x") {
+#ifdef DEBUG_EXIT_ANALYSIS
+    coutn << "Exit ana: " << "user input " << userInput << endl;
+#endif
+    fExitAnalysis = true;
+    return false;
+  }
+  else if (userInput.Index(".qqq")==0 || userInput=="qqq") {
+    gApplication -> Terminate();
+  }
+  else if (userInput.Index(".q")==0 || userInput=="q") {
+#ifdef DEBUG_EXIT_ANALYSIS
+    coutn << "Exit ana: " << "user input " << userInput << endl;
+#endif
+    fExitAnalysis = true;
+    fExitRoot = true;
+    return false;
+  }
+  else
+  {
+    if (userInput=="auto")
+    {
+      fAutoUpdateDrawing = true;
+      couti << Form("automatically update every %d events",fUpdateDrawingEveryNEvent) << endl;
+    }
+    if (userInput=="all")
+    {
+      fUpdateDrawingEveryNEvent = 0;
+      couti << "Reading all events" << endl;
+    }
+    if (userInput.IsDec() && userInput.Atoi()>0)
+    {
+      fUpdateDrawingEveryNEvent = userInput.Atoi();
+      couti << Form("Reading next %d events",fUpdateDrawingEveryNEvent) << endl;
+    }
+  }
+
+  return true;
 }
 
 void Analysis::UpdateCvsOnline(bool firstDraw)
@@ -1233,6 +1456,9 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
   }
   histdEEOnline -> Draw("colz");
 
+  fPadEx -> cd();
+  fHistEx -> Draw();
+
   if (fCvsOnline2!=nullptr) {
     fCvsOnline2 -> Modified();
     fCvsOnline2 -> Update();
@@ -1241,9 +1467,25 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
   fCvsOnline1 -> Update();
 }
 
+bool Analysis::CheckStopFile()
+{
+  if (access("stop",F_OK)!=-1) {
+    coutd << "found stop file" << endl;
+    coutn << "Please remove stop file!" << endl;
+    coutn << "Please remove stop file!" << endl;
+    coutn << "Please remove stop file!" << endl;
+    coutn << "Please remove stop file!" << endl;
+    coutn << "Please remove stop file!" << endl;
+    return true;
+  }
+  return false;
+}
+
 void Analysis::EndOfConversion()
 {
   fFileOut -> cd();
+  cout << endl;
+  couti << "End of conversion!" << endl;
   couti << "Writting tree ..." << endl;
   fTreeOut -> Write();
 
@@ -1270,7 +1512,7 @@ void Analysis::PrintConversionSummary()
 {
   cout << endl;
   couti << "Number of events: " << fCountEvents << endl;
-  couti << "Number of all channels: " << fCountAllChannels << endl;
+  couti << "Number of channels: " << fCountAllChannels << " (from " << fCountAllLines << ")" << endl;
   couti << "Number of times TS-error occured: " << fCountTSError << endl;
   couti << "Number of events with 0   coincidence channels: " << fCoincidenceCount[0] << endl;
   couti << "Number of events with 1   coincidence channels: " << fCoincidenceCount[1] << endl;
@@ -1309,19 +1551,100 @@ TString Analysis::GetDetectorTitle(int midx, int mch, bool addChannel)
   int dch = fMapDetectorChannel[midx][mch];
   TString detectorTitle = fDetectorName[det];
   if (addChannel)
-    detectorTitle = detectorTitle + Form("(%d)",dch);
+    detectorTitle = detectorTitle + Form("-%d",dch);
   return detectorTitle;
 }
 
-bool ECalErrorWasSentOut = false;
 double Analysis::GetCalibratedEnergy(int midx, int mch, int adc)
 {
   if (fFxEnergyConversion[midx][mch]==nullptr) {
-    if (!ECalErrorWasSentOut) {
+    if (!fECalErrorWasSentOut) {
       coute << "Energy conversion (" << midx << " " << mch << ") is nullptr! ..." << endl;
-      ECalErrorWasSentOut = true;
+      fECalErrorWasSentOut = true;
     }
     return 0;
   }
   return fFxEnergyConversion[midx][mch] -> Eval(adc);
+}
+
+void Analysis::MakeTritonCutFile(TString fileName)
+{
+  if (fileName.IsNull())
+    fileName = "tritonCutG.root";
+  fileName = getAna()->GetOutputPath() + fileName;
+  cout << "Creating " << fileName << endl;
+  auto file = new TFile(fileName,"recreate");
+  TCutG* tritonCutG = (TCutG*) gROOT->GetListOfSpecials()->FindObject("CUTG");
+  tritonCutG -> SetName("tritonCutG");
+  file -> cd();
+  tritonCutG -> SetVarX("de");
+  tritonCutG -> SetVarY("ee");
+  //tritonCutG -> SetVarX("ch.gid");
+  //tritonCutG -> SetVarY("ch.energy");
+  
+  
+  tritonCutG -> Write();
+}
+
+void Analysis::CallTritonCutFile(TString fileName)
+{
+  if (fileName.IsNull())
+    fileName = "out/tritonCutG.root";
+  couti << "Set triton graphic cut from " << fileName << endl;
+
+  TDirectory* currentDirectory;
+  if (gDirectory!=nullptr)
+    currentDirectory = gDirectory;
+  TFile* file = new TFile(fileName,"read");
+  TCutG* tritonCutG = (TCutG*) file -> Get("tritonCutG");
+  tritonCutG -> SetVarX("de");
+  tritonCutG -> SetVarY("ee");
+  //tritonCutG -> SetVarX("ch.gid");
+  //tritonCutG -> SetVarY("ch.energy");
+  if (currentDirectory!=nullptr)
+    currentDirectory -> cd();
+}
+
+void Analysis::SetTritonCutFile(TString fileName)
+{
+  couti << "Set triton graphic cut from " << fileName << endl;
+
+  TFile* file = new TFile(fileName,"read");
+  if (file->IsZombie()) {
+    coute << fileName << " is zombie!!" << endl;
+    return;
+  }
+
+  fTritonCutG = (TCutG*) file -> Get("tritonCutG");
+  fTritonCutG -> SetVarX("de");
+  fTritonCutG -> SetVarY("ee");
+
+  fTritonCutGIsSet = true;
+}
+
+const double mp = 938.791;
+const double m48cr = 44669.3;
+const double m50cr = 46524.8;
+const double mt = 2809.45;
+double Analysis::EvalEx(double tp, double tt, double theta)
+{
+  double mtPtt = 2809.45+tt;
+  double mtMtt = 2809.45*tt;
+  double val1 = 2.25559e+09;
+  double val2 = 93049.6*mtPtt - 56327.5*mtMtt;
+  double val3 = 2*sqrt((mp+tp)*(mp+tp)-881329);
+  double val4 = sqrt(mtPtt*mtPtt-7.89301e+06)*cos(theta);
+  double ex = sqrt(val1 - val2 + val3 * val4) - m48cr;
+  return ex;
+
+  /*
+  {
+    double val1 = mp*mp + m50cr*m50cr + mt+mt + 2*(mp+tp)*m50cr;
+    double val2 = 2*(mt+tt)*m50cr - 2*(mp*tp)*(mt*tt);
+    double val3 = 2*sqrt((mp+tp)*(mp+tp)-mp*mp) * sqrt((mt+tt)*(mt+tt)-mt*mt)*cos(theta);
+    double ex = sqrt(val1-val2+val3) - m48cr;
+
+    return ex;
+  }
+  */
 }
