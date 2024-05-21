@@ -14,23 +14,24 @@ void run_conversion(int runNo=-1, double energy=-1)
 
   // general
   ana -> SetReturnIfNoFile(true);
-  ana -> SetIgnoreFileUpdate(false);
+  ana -> SetIgnoreFileUpdate(true);
   ana -> SetAutoUpdateDrawing(true);
-  ana -> SetAutoUpdateRun(false);
+  ana -> SetAutoUpdateRun(true);
   ana -> SetDrawOnline(100000);
   ana -> SetSkipTSError(false);
   ana -> SetStopAtTSError(false);
-  ana -> SetADCThreshold(500);
-  //ana -> SetEventCountLimit(1000);
+  ana -> SetADCThreshold(50);
+  //ana -> SetEventCountLimit(117);
+  //ana -> SetLineCountLimit(125);
   //ana -> SetFileNumberRange(0,10);
   //ana -> SetDrawOnline(1000000);
 
   // alpha calibration
   ana -> AddAlphaCalibrationFile("out/RUN011.alpha.root");
   ana -> AddAlphaCalibrationFile("out/RUN015.alpha.root");
-  ana -> SetShowEnergyConversion(false);
+  ana -> SetShowEnergyConversion(true);
 
-  //ana -> SetCoincidenceTSRange(1);
+  ana -> SetCoincidenceTSRange(15);
   //ana -> SetTritonCutFile("out/tritonCutG.root");
   //ana -> SetCoincidenceMultRange(2,3);
   //ana -> SetdES1Coincidence(true);

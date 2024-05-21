@@ -2,6 +2,7 @@
 
 // Replace define value to "coutx" to omit printing
 #define coutd cout<<"vi +\033[0;36m"<<__LINE__<<" "<<__FILE__<<" #\033[0m "
+//#define coutd coutx
 #define coutn cout<<"\033[0;36mNT\033[0m "
 #define couti cout<<"\033[0;32m==\033[0m "
 #define coutw cout<<"\033[0;33mWR\033[0m "
@@ -9,10 +10,7 @@
 //#define coutt cout<<"\033[0;33mTSERROR\033[0m "
 #define coutt coutx
 
-//#define DEBUG_DATA_LINE
-//#define DEBUG_DATA_LINE_CONDITION
 //#define DEBUG_EVENT_LINE_CONDITION
-//#define DEBUG_EXIT_ANALYSIS
 
 //////////////////////////////////////////////////////////////////////////////
 void setRun(int runNo) { Analysis::GetAnalysis()->SetRunNo(runNo); }
@@ -41,12 +39,6 @@ Analysis::Analysis()
 
 void Analysis::InitializeAnalysis()
 {
-  std::ifstream detFile(fDetFileName);
-  if (detFile.fail()) {
-    coute << "Cannot open detter setting file: " << fDetFileName << endl;
-    return;
-  }
-
   std::ifstream mapFile(fMapFileName);
   if (mapFile.fail()) {
     coute << "Cannot open mapping file: " << fMapFileName << endl;
@@ -141,12 +133,29 @@ void Analysis::InitializeAnalysis()
     for (int iChannel=0; iChannel<fNumChannels; ++iChannel)
       fFxEnergyConversion[midx][iChannel] = nullptr;
 
-  Short_t dist, strip;
-  double rin, rout, amin, amax, amid;
-  while (detFile >> dch >> strip >> rin >> rout >> dist >> amin >> amax >> amid) {
-    fMapS1ChToAngle[dch] = amid;
-    fMapS1ChToStrip[dch] = strip;
+  Short_t strip, det;
+  double rin, rout, amin, amax, amid, dist;
+
+  std::ifstream s1File(fDetFileName);
+  if (s1File.fail()) {
+    coute << "Cannot open detter setting file: " << fDetFileName << endl;
+    return;
   }
+  while (s1File >> det >> dch >> strip >> rin >> rout >> dist >> amin >> amax >> amid) {
+    if (det==1) {
+      fMapS1ChToAngle1[dch] = amin;
+      fMapS1ChToAngle2[dch] = amax;
+      fMapS1ChToAngle[dch] = amid;
+      fMapS1ChToStrip[dch] = strip;
+    }
+    if (det==3) {
+      fMapS3ChToAngle1[dch] = amin;
+      fMapS3ChToAngle2[dch] = amax;
+      fMapS3ChToAngle[dch] = amid;
+      fMapS3ChToStrip[dch] = strip;
+    }
+  }
+
 
   fFiredDetector = new Short_t[fNumDetectors];
   fFiredDCh = new Short_t*[fNumDetectors];
@@ -501,7 +510,10 @@ void Analysis::InitializeDrawing()
 
   if (fUpdateDrawingEveryNEvent>0)
   {
-    fCvsOnline = new TCanvas("cvsOnline",fRunName+" online update canvas 1",1850,800);
+    //fCvsOnline2 = new TCanvas("cvsOnline2",fRunName+" online update canvas 2",60,60,1300,800); 
+    //fCvsOnline2 -> Divide(2,2);
+
+    fCvsOnline = new TCanvas("cvsOnline",fRunName+" online update canvas 1",30,30,1850,800);
     fCvsOnline -> SetMargin(0,0,0,0);
     fCvsOnline -> Divide(4,2,0,0);
 
@@ -523,12 +535,16 @@ void Analysis::InitializeDrawing()
     fVPadChCount  = fCvsOnline -> cd(1);
     fVPadADC      = fCvsOnline -> cd(5);
     fVPadEVSCh    = fCvsOnline -> cd(5);
-    fVPaddEVSE    = fCvsOnline -> cd(6);
-    fVPadEVSStrip = fCvsOnline -> cd(7);
-    fVPadEx       = fCvsOnline -> cd(8);
+    fVPadEVSAngle    = fCvsOnline -> cd(6);
 
-    fVPadEVSCh   -> SetLogz();
-    fVPaddEVSE   -> SetLogz();
+    //fVPadEVSS1Strip  = fCvsOnline -> cd(7);
+    //fVPadEVSS3Strip  = fCvsOnline -> cd(8);
+
+    fVPaddEVSE    = fCvsOnline -> cd(7);
+    fVPadEx       = fCvsOnline -> cd(8);
+    //fVPadEVSStrip = fCvsOnline2 -> cd(2);
+    //fVPadEVSCh   -> SetLogz();
+    //fVPaddEVSE   -> SetLogz();
   }
 
   fHistTriggerRate      = new TH1D("histTriggerRateG",";nch*trigger/s;count",fNumRate,0,fMaxRate);
@@ -612,8 +628,15 @@ void Analysis::InitializeDrawing()
   fHistEVSCh -> SetStats(0);
   fHistdAVSA -> SetStats(0);
   fHistdEVSE -> SetStats(0);
-  fHistEVSStrip = new TH2D("histEVSStrip", ";S1 strip;energy (MeV);", fNumEE,0,fMaxEE,fNumStrips+1,0,fMaxStrips);
-  fHistEVSStrip -> SetStats(0);
+  //fHistEVSStrip = new TH2D("histEVSStrip", ";S1 strip;energy (MeV);", fNumEE,0,fMaxEE,fNumStrips+1,0,fMaxStrips);
+  //fHistEVSStrip -> SetStats(0);
+
+  fHistEVSS1Strip = new TH2D("histEVSS1Strip",";S1 strip;energy (MeV)",fNumStrips+1,0,fNumStrips,fNumEE,0,fMaxEE);
+  fHistEVSS3Strip = new TH2D("histEVSS3Strip",";S3 strip;energy (MeV)",fNumStrips+1,0,fNumStrips,fNumEE,0,fMaxEE);
+  fHistEVSAngle   = new TH2D("histEVSAngle"  ,";angle (deg);energy",40,20,40,fNumEE,0,fMaxEE);
+  fHistEVSS1Strip -> SetStats(0);
+  fHistEVSS3Strip -> SetStats(0);
+  fHistEVSAngle   -> SetStats(0);
 
   fHistEx = new TH1D("histEx",";Cr excitation energy;count",fNumEx,0,fMaxEx);
   fHistEx -> SetFillColor(29);
@@ -625,7 +648,7 @@ void Analysis::InitializeDrawing()
     SetAttribute(fHistEventRateError,fVPadEventRate,4);
     SetAttribute(fHistTSDist1,fVPadTSDist1,4);
     SetAttribute(fHistTSDist2,fVPadTSDist2,4);
-    SetAttribute(fHistChCount,fVPadChCount);
+    SetAttribute(fHistChCount,fVPadChCount,1,true);
     SetAttribute(fHistEx,fVPadEx);
     SetAttribute(fHistADC,fVPadADC);
     SetAttribute(fHistE,fVPadADC);
@@ -633,7 +656,10 @@ void Analysis::InitializeDrawing()
     SetAttribute(fHistEVSCh,fVPadEVSCh,1,true);
     SetAttribute(fHistdAVSA,fVPaddEVSE,1,true);
     SetAttribute(fHistdEVSE,fVPaddEVSE,1,true);
-    SetAttribute(fHistEVSStrip, fVPadEVSStrip,1,true);
+    SetAttribute(fHistEVSS1Strip,fVPadEVSS1Strip,1,true);
+    SetAttribute(fHistEVSS3Strip,fVPadEVSS3Strip,1,true);
+    SetAttribute(fHistEVSAngle,fVPadEVSAngle,1,true);
+    //SetAttribute(fHistEVSStrip, fVPadEVSStrip,1,true);
     SetAttribute(fHistBeamCountInTime,  fVPadBeamCountInTime,4);
     SetAttribute(fHistEventCountInTime, fVPadEventCountInTime,4);
     SetAttribute(fHistLocalCountInTime, fVPadLocalCountInTime,4);
@@ -813,7 +839,7 @@ void Analysis::ReadDataFile()
     fChannelArray -> Clear("C");
     Long64_t countEventsSingleFile = 0;
     fCountChannels = 0;
-    Long64_t countLine = 0;
+    Long64_t countLines = 0;
     fdEArrayIdx.clear();
     fS1ArrayIdx.clear();
     fS3ArrayIdx.clear();
@@ -826,17 +852,13 @@ void Analysis::ReadDataFile()
     {
       fLastDataPos = fDataFile.tellg();
 
-      countLine++;
+      countLines++;
       numData = (Int_t) sscanf(buffer, "%hu,%hu,%hu,%lld,%hu", &FENumber, &mch, &adc, &tsLocal, &tsGroup);
       if (numData != 5) {
         coute << Form("Number of data in line is not 5 (%d)!",numData) << endl;
         coute << FENumber<<" "<<mch<<" "<<adc<<" "<<tsLocal<<" "<<tsGroup << endl;
         continue;
       }
-#ifdef DEBUG_DATA_LINE
-      coutd << fCountAskContinueRun << endl;
-      if (fCountAskContinueRun==1) coutd << FENumber<<" "<<mch<<" "<<adc<<" "<<tsLocal<<" "<<tsGroup << endl;
-#endif
 
       timeStamp = tsLocal;
       if (tsGroup>0) timeStamp += (Long64_t)(tsGroup) * 0xFFFFFFFFFF; 
@@ -847,9 +869,16 @@ void Analysis::ReadDataFile()
         else { fHistTSDist2 -> Fill(dts); }
       }
 
+      //eventStatus = kNextEvent;
       if (timeStamp<fTimeStampPrev) eventStatus = kTSError;
       else if (timeStamp-fTimeStampPrev<=fCoincidenceTSRange) eventStatus = kSameEvent;
       else eventStatus = kNextEvent;
+
+      //coutd <<countLines<< " " << FENumber<<" "<<mch<<" "<<adc<<" "<<tsLocal<<" "<<tsGroup << endl;
+      //coutd << timeStamp << " " << fTimeStampPrev << endl;
+      //if (eventStatus==kSameEvent) coutd << "same event" << endl;
+      //if (eventStatus==kNextEvent) coutd << "next event" << endl;
+      //if (eventStatus==kTSError) coutd << "ts error" << endl;
 
       fMinuiteBin = timeStamp*fSecondPerTS/60.;
 
@@ -894,6 +923,7 @@ void Analysis::ReadDataFile()
         bool eventIsFilled = true;
         if (countEventsSingleFile>0) {
           eventIsFilled = FillDataTree();
+          //coutd << "event is filled " << eventIsFilled << endl;
           if (UpdateDrawing()==false)
             break;
         }
@@ -966,7 +996,7 @@ void Analysis::ReadDataFile()
         fChannelArray -> Clear("C");
         ch = (ChannelData*) fChannelArray -> ConstructedAt(fCountChannels++);
 
-        //fTimeStampPrev = timeStamp;
+        fTimeStampPrev = timeStamp;
         //fTimeStampPrevTrue = timeStamp;
       }
       else if (eventStatus==kTSError && fSkipTSError)
@@ -989,6 +1019,14 @@ void Analysis::ReadDataFile()
       if      (fFiredDetector[det]>= 0) fFiredDetector[det] = -2;
       else if (fFiredDetector[det]==-1) fFiredDetector[det] = dataIndex;
       fFiredDCh[det][dch] = dataIndex;
+      {
+        if (det==kS1J) fHistEVSS1Strip -> Fill(fMapS1ChToStrip[dch],energy);
+        if (det==kS3J) fHistEVSS3Strip -> Fill(fMapS3ChToStrip[dch],energy);
+        //if (det==kS1J) fHistEVSAngle -> Fill(fMapS1ChToAngle[dch],energy);
+        //if (det==kS3J) fHistEVSAngle -> Fill(fMapS3ChToAngle[dch],energy);
+        if (det==kS1J) fHistEVSAngle -> Fill(gRandom->Uniform(fMapS1ChToAngle1[dch],fMapS1ChToAngle2[dch]),energy);
+        if (det==kS3J) fHistEVSAngle -> Fill(gRandom->Uniform(fMapS3ChToAngle1[dch],fMapS3ChToAngle2[dch]),energy);
+      }
 
       if (fdES1CoincidenceMode || fdES1S3CoincidenceMode)
       {
@@ -1006,6 +1044,12 @@ void Analysis::ReadDataFile()
         }
       }
 
+      //coutd << fCountEvents << endl;
+
+      if (fLineCountLimit>0 && countLines>=fLineCountLimit) {
+        couti << "Event count limit at " << fCountEvents << "!" << endl;
+        fExitAnalysis = true;
+      }
       if (fEventCountLimit>0 && fCountEvents>=fEventCountLimit) {
         couti << "Event count limit at " << fCountEvents << "!" << endl;
         fExitAnalysis = true;
@@ -1241,7 +1285,9 @@ bool Analysis::FillDataTree()
   /////////////////////////////////////////////////////////////////////////
   // check coincidence cut
   if (fdES1CoincidenceMode) {
-    //if (fdEArrayIdx.size()==1 && fS1ArrayIdx.size()==1)
+
+    //if (fCountChannels>=2) coute << fFiredDetector[kdE] << " " << fFiredDetector[kS1J] <<  endl;
+
     if (fFiredDetector[kdE]>=0 && fFiredDetector[kS1J]>=0)
       fGoodCoincidenceEvent = true;
     else {
@@ -1280,8 +1326,8 @@ bool Analysis::FillDataTree()
   {
     //auto chdE = (ChannelData*) fChannelArray -> At(fdEArrayIdx[0]);
     //auto chS1 = (ChannelData*) fChannelArray -> At(fS1ArrayIdx[0]);
-    auto chdE = (ChannelData*) fChannelArray -> At(fFiredDetector[kS1J]);
-    auto chS1 = (ChannelData*) fChannelArray -> At(fFiredDetector[kS3J]);
+    auto chdE = (ChannelData*) fChannelArray -> At(fFiredDetector[kdE]);
+    auto chS1 = (ChannelData*) fChannelArray -> At(fFiredDetector[kS1J]);
     auto S1dCh = chS1->dch;
     groupdE = fMapDetectorGroup[chdE->midx][chdE->mch];
     groupS1 = fMapDetectorGroup[chS1->midx][chS1->mch];
@@ -1291,8 +1337,8 @@ bool Analysis::FillDataTree()
     {
       fHistdAVSA -> Fill(chdE->adc, chdE->adc+chS1->adc);
       fHistdEVSE -> Fill(bdE, bESum);
-      auto strip = fMapS1ChToStrip[chS1->dch];
-      fHistEVSStrip -> Fill(bESum,strip);
+      //auto strip = fMapS1ChToStrip[chS1->dch];
+      //fHistEVSStrip -> Fill(bESum,strip);
 
       //if (fS3ArrayIdx.size()==1)
       if (fFiredDetector[kS3J]>=0)
@@ -1325,16 +1371,16 @@ bool Analysis::FillDataTree()
   /////////////////////////////////////////////////////////////////////////
 
 #ifdef DEBUG_EVENT_LINE_CONDITION
-      if (badEventType==1)
-        coutd << Form("Bad event: Too much fired channel dE(%d) S1(%d)",fdEArrayIdx.size(),fS1ArrayIdx.size());
-      if (badEventType==2)
-        coutd << Form("Bad event: Too much fired channel dE(%d) S1(%d) S3(%d)",
-                      fdEArrayIdx.size(),fS1ArrayIdx.size(),fS3ArrayIdx.size());
-      if (badEventType==3)
-        coutd << Form("Bad event: mult %d out of %d - %d",
-                      fCountChannels,fCoincidenceMultRange1,fCoincidenceMultRange2);
-      if (badEventType==4)
-        coutd << Form("Bad event: dE(%d), S1(%d) are not in same group!",groupdE,groupS1) << endl;
+  if (badEventType==1)
+    coutd << Form("Bad event: Too much fired channel dE(%d) S1(%d)",fdEArrayIdx.size(),fS1ArrayIdx.size());
+  if (badEventType==2)
+    coutd << Form("Bad event: Too much fired channel dE(%d) S1(%d) S3(%d)",
+        fdEArrayIdx.size(),fS1ArrayIdx.size(),fS3ArrayIdx.size());
+  if (badEventType==3)
+    coutd << Form("Bad event: mult %d out of %d - %d",
+        fCountChannels,fCoincidenceMultRange1,fCoincidenceMultRange2);
+  if (badEventType==4)
+    coutd << Form("Bad event: dE(%d), S1(%d) are not in same group!",groupdE,groupS1) << endl;
 #endif
 
   if (CheckEventCondition(bdE, bESum)==false)
@@ -1434,9 +1480,7 @@ bool Analysis::AskContinueRun(TString message)
   userInput.ToLower();
 
   if (userInput=="stop" || userInput=="exit" || userInput=="x") {
-#ifdef DEBUG_EXIT_ANALYSIS
     coutn << "Exit ana: " << "user input " << userInput << endl;
-#endif
     fExitAnalysis = true;
     return false;
   }
@@ -1444,9 +1488,7 @@ bool Analysis::AskContinueRun(TString message)
     gApplication -> Terminate();
   }
   else if (userInput.Index(".q")==0 || userInput=="q") {
-#ifdef DEBUG_EXIT_ANALYSIS
     coutn << "Exit ana: " << "user input " << userInput << endl;
-#endif
     fExitAnalysis = true;
     fExitRoot = true;
     return false;
@@ -1529,9 +1571,7 @@ bool Analysis::AskUpdateDrawing(TString message)
   TString userInput = userInput0;
   userInput.ToLower();
   if (userInput=="stop" || userInput=="exit" || userInput=="x") {
-#ifdef DEBUG_EXIT_ANALYSIS
     coutn << "Exit ana: " << "user input " << userInput << endl;
-#endif
     fExitAnalysis = true;
     return false;
   }
@@ -1539,9 +1579,7 @@ bool Analysis::AskUpdateDrawing(TString message)
     gApplication -> Terminate();
   }
   else if (userInput.Index(".q")==0 || userInput=="q") {
-#ifdef DEBUG_EXIT_ANALYSIS
     coutn << "Exit ana: " << "user input " << userInput << endl;
-#endif
     fExitAnalysis = true;
     fExitRoot = true;
     return false;
@@ -1709,18 +1747,31 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
   DrawModuleBoundary(yMax);
   TakeCareOfStatsBox(hist2DOnline);
 
-  fVPaddEVSE -> cd();
-  TH2D* histdEEOnline = fHistdAVSA;
-  if (fShowEnergyConversion) {
-    histdEEOnline = fHistdEVSE;
+  if (fVPaddEVSE!=nullptr) {
+    fVPaddEVSE -> cd();
+    TH2D* histdEEOnline = fHistdAVSA;
+    if (fShowEnergyConversion) {
+      histdEEOnline = fHistdEVSE;
+    }
+    histdEEOnline -> Draw("colz");
   }
-  histdEEOnline -> Draw("colz");
 
-  fVPadEVSStrip -> cd();
-  fHistEVSStrip -> Draw("colz");
+  if (fVPadEVSS1Strip!=nullptr) { fVPadEVSS1Strip -> cd(); fHistEVSS1Strip -> Draw("colz"); }
+  if (fVPadEVSS3Strip!=nullptr) { fVPadEVSS3Strip -> cd(); fHistEVSS3Strip -> Draw("colz"); }
+  if (fVPadEVSAngle  !=nullptr) { fVPadEVSAngle -> cd();   fHistEVSAngle   -> Draw("colz"); }
 
-  fVPadEx -> cd();
-  fHistEx -> Draw();
+  //fVPadEVSStrip -> cd();
+  //fHistEVSStrip -> Draw("colz");
+
+  if (fVPadEx!=nullptr) {
+    fVPadEx -> cd();
+    fHistEx -> Draw();
+  }
+
+  if (fCvsOnline2!=nullptr) {
+    fCvsOnline2 -> Modified();
+    fCvsOnline2 -> Update();
+  }
 
   fCvsOnline -> Modified();
   fCvsOnline -> Update();
@@ -1746,6 +1797,7 @@ void Analysis::EndOfConversion()
   cout << endl;
   couti << "End of conversion!" << endl;
   couti << "Writting tree ..." << endl;
+  //coutd << endl; gApplication -> Terminate();
   fTreeOut -> Write();
 
   if (fCvsOnline!=nullptr)

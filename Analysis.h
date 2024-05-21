@@ -14,6 +14,7 @@ const int kS3O = 4;
 const int kSC  = 5;
 const int kFC  = 6;
 
+#include "TRandom.h"
 #include "TClonesArray.h"
 #include "TString.h"
 #include "TFile.h"
@@ -65,12 +66,13 @@ class Analysis
     void SetStopAtTSError(bool stop) { fStopAtTSError = stop; }
     void SetFileNumberRange(int d1, int d2) { fFileNumberRange1 = d1, fFileNumberRange2 = d2; }
     void SetEventCountLimit(Long64_t limit) { fEventCountLimit = limit; }
+    void SetLineCountLimit(Long64_t limit) { fLineCountLimit = limit; }
     void SetReturnIfNoFile(bool value) { fReturnIfNoFile = value; }
     void SetIgnoreFileUpdate(bool value) { fIgnoreFileUpdate = value; }
     void SetADCThreshold(UShort_t value) { fADCThreshold = value; }
     void SetAutoUpdateRun(bool value) { fAutoUpdateRun = value; }
     void SetAutoUpdateDrawing(bool value) { fAutoUpdateDrawing = value; }
-    void SetShowEnergyConversion(bool value) { fShowEnergyConversion = true; }
+    void SetShowEnergyConversion(bool value) { fShowEnergyConversion = value; }
     void SetCoincidenceTSRange(int value) { fCoincidenceTSRange = value; }
     void SetCoincidenceMultRange(int r1, int r2) {
       fCoincidenceMultRange1 = r1;
@@ -131,14 +133,18 @@ class Analysis
     double fBeamEnergy = 0;
     bool fAutoUpdateRun = false;
     bool fAutoUpdateDrawing = false;
-    int fUpdateAfterXSec = 3;
+    int fUpdateAfterXSec = 5;
     Long64_t fUpdateDrawingEveryNEvent = 0;
     Long64_t fCountEventsForUpdate = 0;
     TCanvas* fCvsOnline = nullptr;
+    TCanvas* fCvsOnline2 = nullptr;
     TVirtualPad* fVPadEx      = nullptr;
     TVirtualPad* fVPadChCount = nullptr;
     TVirtualPad* fVPadADC     = nullptr;
     TVirtualPad* fVPadEVSCh   = nullptr;
+    TVirtualPad* fVPadEVSS1Strip = nullptr;
+    TVirtualPad* fVPadEVSS3Strip = nullptr;
+    TVirtualPad* fVPadEVSAngle   = nullptr;
     TVirtualPad* fVPaddEVSE   = nullptr;
     TVirtualPad* fVPadTriggerRate = nullptr;
     TVirtualPad* fVPadEventRate = nullptr;
@@ -148,7 +154,7 @@ class Analysis
     TVirtualPad* fVPadStripCountInTime = nullptr;
     TVirtualPad* fVPadTSDist1 = nullptr;
     TVirtualPad* fVPadTSDist2 = nullptr;
-    TVirtualPad* fVPadEVSStrip = nullptr;
+    //TVirtualPad* fVPadEVSStrip = nullptr;
 
     TVirtualPad* fVPadProtonCountInTime = nullptr;
     TVirtualPad* fVPadDeuteronCountInTime = nullptr;
@@ -170,9 +176,13 @@ class Analysis
 
     TH2D* fHistAVSCh = nullptr; ///< ADC vs channel-id
     TH2D* fHistEVSCh = nullptr; ///< energy vs channel-id
+    TH2D* fHistEVSS1Strip = nullptr;
+    TH2D* fHistEVSS3Strip = nullptr;
+    TH2D* fHistEVSAngle   = nullptr;
+
     TH2D* fHistdAVSA = nullptr;
     TH2D* fHistdEVSE = nullptr;
-    TH2D* fHistEVSStrip = nullptr;
+    //TH2D* fHistEVSStrip = nullptr;
 
     TH1D* fHistTriggerRate = nullptr;
     TH1D* fHistTriggerRateError = nullptr;
@@ -250,8 +260,14 @@ class Analysis
     int** fMapDetectorToGlobalID;
     int* fMapGlobalIDToModuleIndex;
     int* fMapGlobalIDToMCh;
+    double fMapS1ChToAngle1[33];
+    double fMapS1ChToAngle2[33];
     double fMapS1ChToAngle[33];
+    double fMapS3ChToAngle1[33];
+    double fMapS3ChToAngle2[33];
+    double fMapS3ChToAngle[33];
     int fMapS1ChToStrip[33];
+    int fMapS3ChToStrip[33];
 
   // alpha energy calibration
   public:
@@ -314,6 +330,7 @@ class Analysis
 
     Long64_t fCountEvents = 0;
     Long64_t fEventCountLimit = -1;
+    Long64_t fLineCountLimit = -1;
     Long64_t fLastDataPos;
     Long64_t fLastDataFileSize;
 
