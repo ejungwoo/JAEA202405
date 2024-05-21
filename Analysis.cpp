@@ -1,7 +1,7 @@
 #include "Analysis.h"
 
 // Replace define value to "coutx" to omit printing
-#define coutd cout<<"+\033[0;36m"<<__LINE__<<" "<<__FILE__<<" #\033[0m "
+#define coutd cout<<"vi +\033[0;36m"<<__LINE__<<" "<<__FILE__<<" #\033[0m "
 #define coutn cout<<"\033[0;36mNT\033[0m "
 #define couti cout<<"\033[0;32m==\033[0m "
 #define coutw cout<<"\033[0;33mWR\033[0m "
@@ -15,9 +15,14 @@
 //#define DEBUG_EXIT_ANALYSIS
 
 //////////////////////////////////////////////////////////////////////////////
+void setRun(int runNo) { Analysis::GetAnalysis()->SetRunNo(runNo); }
 Analysis *getAna() { return Analysis::GetAnalysis(); }
-void makeTCut(TString fileName="") { Analysis::MakeTritonCutFile(fileName); }
-void callTCut(TString fileName="") { Analysis::CallTritonCutFile(fileName); }
+void makeCutG(int pdt) { Analysis::MakeCutGFile(pdt); }
+void callCuts() {
+   Analysis::CallCutGFile(1);
+   Analysis::CallCutGFile(2);
+   Analysis::CallCutGFile(3);
+}
 //////////////////////////////////////////////////////////////////////////////
 
 Analysis* Analysis::fInstance = nullptr;
@@ -36,6 +41,12 @@ Analysis::Analysis()
 
 void Analysis::InitializeAnalysis()
 {
+  std::ifstream detFile(fDetFileName);
+  if (detFile.fail()) {
+    coute << "Cannot open detter setting file: " << fDetFileName << endl;
+    return;
+  }
+
   std::ifstream mapFile(fMapFileName);
   if (mapFile.fail()) {
     coute << "Cannot open mapping file: " << fMapFileName << endl;
@@ -68,10 +79,10 @@ void Analysis::InitializeAnalysis()
     fMapFEToModuleIndex[iModule] = -1;
 
 
-  fMapDetectorToGlobalID = new int*[10];
-  for (int det=0; det<10; ++det) {
-    fMapDetectorToGlobalID[det] = new int[32];
-    for (int dch=0; dch<10; ++dch) {
+  fMapDetectorToGlobalID = new int*[fNumDetectors];
+  for (int det=0; det<fNumDetectors; ++det) {
+    fMapDetectorToGlobalID[det] = new int[fMaxDCh];
+    for (int dch=0; dch<fMaxDCh; ++dch) {
       fMapDetectorToGlobalID[det][dch] = -1;
     }
   }
@@ -130,6 +141,19 @@ void Analysis::InitializeAnalysis()
     for (int iChannel=0; iChannel<fNumChannels; ++iChannel)
       fFxEnergyConversion[midx][iChannel] = nullptr;
 
+  Short_t dist, strip;
+  double rin, rout, amin, amax, amid;
+  while (detFile >> dch >> strip >> rin >> rout >> dist >> amin >> amax >> amid) {
+    fMapS1ChToAngle[dch] = amid;
+    fMapS1ChToStrip[dch] = strip;
+  }
+
+  fFiredDetector = new Short_t[fNumDetectors];
+  fFiredDCh = new Short_t*[fNumDetectors];
+  for (int det=0; det<fNumDetectors; ++det)
+    fFiredDCh[det] = new Short_t[fMaxDCh];
+  ResetFired();
+
   fCountEvents = 0;
   fChannelArray = nullptr;
   fCountChannels = 0;
@@ -141,18 +165,28 @@ void Analysis::InitializeAnalysis()
   fCoincidenceCount[2] = 0;
   fCoincidenceCount[3] = 0;
   fCoincidenceCount[4] = 0;
-
-  if (fSkipTSError )
-  {
-    coutw << "The program will ignore time-stamp error!" << endl;
-    coutw << "The program will ignore time-stamp error!" << endl;
-    coutw << "The program will ignore time-stamp error!" << endl;
-    coutw << "The program will ignore time-stamp error!" << endl;
-  }
 }
 
-void Analysis::RunConversion(int runNo, TString pathIn)
+void Analysis::ResetFired()
 {
+  for (int det=0; det<fNumDetectors; ++det)
+    fFiredDetector[det] = -1;
+
+  for (int det=0; det<fNumDetectors; ++det)
+    for (int dch=0; dch<fMaxDCh; ++dch)
+      fFiredDCh[det][dch] = -1;
+}
+
+void Analysis::RunConversion(int runNo)
+{
+  if (fSkipTSError)
+  {
+    coutn << "The program will skip time-stamp error!" << endl;
+    coutn << "The program will skip time-stamp error!" << endl;
+    coutn << "The program will skip time-stamp error!" << endl;
+    coutn << "The program will skip time-stamp error!" << endl;
+  }
+
   if (fEnergyConversionIsSet==false&&fShowEnergyConversion==true) {
     coutw << "Energy conversion is not set! Cannot proceed energy conversion." << endl;
     fShowEnergyConversion = false;
@@ -160,7 +194,6 @@ void Analysis::RunConversion(int runNo, TString pathIn)
 
   fRunNo = runNo; 
   fRunName = Form("[RUN%03d]",fRunNo);
-  fPathToInput = (pathIn.IsNull() ? TString("/home/daquser/data/LiCD2Irrad/analysis/input/") : pathIn);
 
   ConfigureDateTime();
   SetConversionFile();
@@ -178,9 +211,13 @@ void Analysis::AddAlphaCalibrationFile(TString name)
 
   for (int midx=0; midx<fNumModules; ++midx) {
     for (int iChannel=0; iChannel<fNumChannels; ++iChannel) {
-      auto f1 = (TF1*) file -> Get(Form("AToE_%d_%d",midx,iChannel));
-      if (f1!=nullptr)
+      TString f1Name = Form("AToE_%d_%d",midx,iChannel);
+      auto f1 = (TF1*) file -> Get(f1Name);
+      if (f1!=nullptr) {
+        if (fFxEnergyConversion[midx][iChannel]!=nullptr)
+          coute << f1Name << " already set!!! Overwriting ..." << endl;
         fFxEnergyConversion[midx][iChannel] = f1;
+      }
     }
   }
 
@@ -464,40 +501,89 @@ void Analysis::InitializeDrawing()
 
   if (fUpdateDrawingEveryNEvent>0)
   {
-    fCvsOnline1 = new TCanvas("cvsOnline",fRunName+" online update canvas 1",1800,800);
-    fCvsOnline1 -> SetMargin(0,0,0,0);
-    fCvsOnline1 -> Divide(3,2,0,0);
+    fCvsOnline = new TCanvas("cvsOnline",fRunName+" online update canvas 1",1850,800);
+    fCvsOnline -> SetMargin(0,0,0,0);
+    fCvsOnline -> Divide(4,2,0,0);
 
-    fCvsOnline1 -> cd(2) -> Divide(2,2,0,0);
-    fPadTSDist1 = fCvsOnline1 -> cd(2) -> cd(1);
-    fPadTSDist2 = fCvsOnline1 -> cd(2) -> cd(2);
-    fPadTrgRate = fCvsOnline1 -> cd(2) -> cd(3);
-    fPadEvtRate = fCvsOnline1 -> cd(2) -> cd(4);
-    fPadEx      = fCvsOnline1 -> cd(3);
-    fPadChCount = fCvsOnline1 -> cd(1);
-    fPadADC     = fCvsOnline1 -> cd(5);
-    fPadEVSCh   = fCvsOnline1 -> cd(4);
-    fPaddEVSE   = fCvsOnline1 -> cd(6);
-    fPadEVSCh   -> SetLogz();
-    fPaddEVSE   -> SetLogz();
+                      //fCvsOnline -> cd(2) -> SetMargin(0,0,0,0);
+                      fCvsOnline -> cd(2) -> Divide(2,2,0,0);
+    fVPadTSDist1     = fCvsOnline -> cd(2) -> cd(1);
+    fVPadTSDist2     = fCvsOnline -> cd(2) -> cd(2);
+    fVPadTriggerRate = fCvsOnline -> cd(2) -> cd(3);
+    fVPadEventRate   = fCvsOnline -> cd(2) -> cd(4);
+
+                           //fCvsOnline -> cd(6) -> SetMargin(0,0,0,0);
+                           fCvsOnline -> cd(3) -> Divide(1,2,0,0);
+    fVPadBeamCountInTime  = fCvsOnline -> cd(3) -> cd(1);
+    fVPadEventCountInTime = fCvsOnline -> cd(3) -> cd(2);
+                           fCvsOnline -> cd(4) -> Divide(1,2,0,0);
+    fVPadLocalCountInTime = fCvsOnline -> cd(4) -> cd(1);
+    fVPadStripCountInTime = fCvsOnline -> cd(4) -> cd(2);
+
+    fVPadChCount  = fCvsOnline -> cd(1);
+    fVPadADC      = fCvsOnline -> cd(5);
+    fVPadEVSCh    = fCvsOnline -> cd(5);
+    fVPaddEVSE    = fCvsOnline -> cd(6);
+    fVPadEVSStrip = fCvsOnline -> cd(7);
+    fVPadEx       = fCvsOnline -> cd(8);
+
+    fVPadEVSCh   -> SetLogz();
+    fVPaddEVSE   -> SetLogz();
   }
 
-  fHistTriggerRate      = new TH1D("histTrgRateG",";nch*trigger/s;count",fNumRate,0,fMaxRate);
-  fHistTriggerRateError = new TH1D("histTrgRateE","Bad trigger rate;trigger/s;count",fNumRate,0,fMaxRate);
+  fHistTriggerRate      = new TH1D("histTriggerRateG",";nch*trigger/s;count",fNumRate,0,fMaxRate);
+  fHistTriggerRateError = new TH1D("histTriggerRateE","Bad trigger rate;trigger/s;count",fNumRate,0,fMaxRate);
   fHistTriggerRateError -> SetLineStyle(2);
   //fHistTriggerRate      -> SetFillColor(kGray);
   fHistTriggerRate      -> SetLineColor(kBlack);
   fHistTriggerRateError -> SetLineColor(kBlack);
 
-  fHistEventRate      = new TH1D("histEvtRateG",";event/s;count",fNumRate,0,fMaxRate);
-  fHistEventRateError = new TH1D("histEvtRateE","Bad event rate;event/s;count",fNumRate,0,fMaxRate);
+  TString titleLC = "Local count";
+  if (fChosenDet>=0 && fEnergyRange1>0) {
+    titleLC = Form("[%s-%d]  %.2f < energy < %.2f (MeV)",
+                   fEnergyRange1,fEnergyRange2,fDetectorName[fChosenDet].Data(),fChosenDCh);
+  }
+  else if (fChosenDet>=0)
+    titleLC = Form("[%s-%d]",fDetectorName[fChosenDet].Data(),fChosenDCh);
+  else if (fEnergyRange1>0)
+    titleLC = Form("%.2f < energy < %.2f (MeV)",fEnergyRange1,fEnergyRange2);
+
+  TString titleSC = "Strip count";
+  if (fEnergyRange1>0)
+    titleSC = Form("%.2f < energy < %.2f (MeV)",fEnergyRange1,fEnergyRange2);
+
+  int maxTime = 200;
+  fHistBeamCountInTime  = new TH1D("histBeamCountInTime","beam count;time (min);count",maxTime,0,maxTime);
+  fHistLocalCountInTime = new TH1D("histLocalCountInTime",titleLC+";time (min);count",maxTime,0,maxTime);
+  fHistEventCountInTime = new TH1D("histEventCountInTime","event count;time (min);count",maxTime,0,maxTime);
+  fHistEventCountInTime -> SetFillColor(29);
+  fHistStripCountInTime[0] = new TH1D("histStripCountInTime",titleSC+";time (min);count",maxTime,0,maxTime);
+  fHistStripCountInTime[0] -> SetStats(0);
+  for (int strip=1; strip<=fNumStrips; ++strip) {
+    auto name = Form("histStrip%dCIT",strip);
+    auto title = Form("strip %d count;time (min);count",strip);
+    fHistStripCountInTime[strip] = new TH1D(name,title,maxTime,0,maxTime);
+    fHistStripCountInTime[strip] -> SetLineColor(strip);
+    if (strip>9) {
+      fHistStripCountInTime[strip] -> SetLineColor(strip-9);
+      fHistStripCountInTime[strip] -> SetLineStyle(2);
+    }
+  }
+
+  fHistBeamCountInTime  -> SetStats(0);
+  fHistLocalCountInTime -> SetStats(0);
+  fHistEventCountInTime -> SetStats(0);
+  for (int strip=1; strip<=fNumStrips; ++strip) fHistStripCountInTime[strip] -> SetStats(0);
+
+  fHistEventRate      = new TH1D("histEventRateG",";event/s;count",fNumRate,0,fMaxRate);
+  fHistEventRateError = new TH1D("histEventRateE","Bad event rate;event/s;count",fNumRate,0,fMaxRate);
   fHistEventRateError -> SetLineStyle(2);
   fHistEventRate      -> SetFillColor(29);
   fHistEventRate      -> SetLineColor(kBlue);
   fHistEventRateError -> SetLineColor(kBlue);
   //fHistEventRate      -> SetStats(0);
 
-  if (fPadTrgRate==fPadEvtRate) {
+  if (fVPadTriggerRate==fVPadEventRate) {
     //fHistTriggerRate -> SetTitle("Trigger*NCh (black) / Event (blue) rate;trigger/s;count");
     fHistEventRate -> SetTitle("Trigger*NCh (black) / Event (blue) rate;trigger/s;count");
     //fHistEventRate -> SetTitle(";Trigger*NCh/s (black) / Event/s (blue);count");
@@ -521,30 +607,38 @@ void Analysis::InitializeDrawing()
   fHistAVSCh = new TH2D("histAVSCh", "ADC vs module-ch;;ADC", fNumCh,0,fNumCh,fNumADC,0,fMaxADC);
   fHistEVSCh = new TH2D("histEVSCh", ";;energy (MeV)", fNumCh,0,fNumCh,fNumE,0,fMaxE);
   fHistdAVSA = new TH2D("histdAVSA", "dA vs dA + S1;dA + S1A;dA", fNumADC, 0, 2*fMaxADC, fNumADC, 0, fMaxADC);
-  fHistdEVSE = new TH2D("histdEVSE", ";dE + S1E (MeV);dE (MeV)", fNumE,0,fMaxE+fMaxdE, fNumdE, 0, fMaxdE);
+  fHistdEVSE = new TH2D("histdEVSE", ";energy (MeV);dE (MeV)", fNumEE,0,fMaxEE, fNumdE, 0, fMaxdE);
   fHistAVSCh -> SetStats(0);
   fHistEVSCh -> SetStats(0);
   fHistdAVSA -> SetStats(0);
   fHistdEVSE -> SetStats(0);
+  fHistEVSStrip = new TH2D("histEVSStrip", ";S1 strip;energy (MeV);", fNumEE,0,fMaxEE,fNumStrips+1,0,fMaxStrips);
+  fHistEVSStrip -> SetStats(0);
 
   fHistEx = new TH1D("histEx",";Cr excitation energy;count",fNumEx,0,fMaxEx);
   fHistEx -> SetFillColor(29);
 
   if (fUpdateDrawingEveryNEvent>0) {
-    SetAttribute(fHistTriggerRate,fPadTrgRate,16);
-    SetAttribute(fHistTriggerRateError,fPadTrgRate,16);
-    SetAttribute(fHistEventRate,fPadEvtRate,16);
-    SetAttribute(fHistEventRateError,fPadEvtRate,16);
-    SetAttribute(fHistTSDist1,fPadTSDist1,16);
-    SetAttribute(fHistTSDist2,fPadTSDist2,16);
-    SetAttribute(fHistChCount,fPadChCount);
-    SetAttribute(fHistEx,fPadEx);
-    SetAttribute(fHistADC,fPadADC);
-    SetAttribute(fHistE,fPadADC);
-    SetAttribute(fHistAVSCh,fPadEVSCh,1,true);
-    SetAttribute(fHistEVSCh,fPadEVSCh,1,true);
-    SetAttribute(fHistdAVSA,fPaddEVSE,1,true);
-    SetAttribute(fHistdEVSE,fPaddEVSE,1,true);
+    SetAttribute(fHistTriggerRate,fVPadTriggerRate,4);
+    SetAttribute(fHistTriggerRateError,fVPadTriggerRate,4);
+    SetAttribute(fHistEventRate,fVPadEventRate,4);
+    SetAttribute(fHistEventRateError,fVPadEventRate,4);
+    SetAttribute(fHistTSDist1,fVPadTSDist1,4);
+    SetAttribute(fHistTSDist2,fVPadTSDist2,4);
+    SetAttribute(fHistChCount,fVPadChCount);
+    SetAttribute(fHistEx,fVPadEx);
+    SetAttribute(fHistADC,fVPadADC);
+    SetAttribute(fHistE,fVPadADC);
+    SetAttribute(fHistAVSCh,fVPadEVSCh,1,true);
+    SetAttribute(fHistEVSCh,fVPadEVSCh,1,true);
+    SetAttribute(fHistdAVSA,fVPaddEVSE,1,true);
+    SetAttribute(fHistdEVSE,fVPaddEVSE,1,true);
+    SetAttribute(fHistEVSStrip, fVPadEVSStrip,1,true);
+    SetAttribute(fHistBeamCountInTime,  fVPadBeamCountInTime,4);
+    SetAttribute(fHistEventCountInTime, fVPadEventCountInTime,4);
+    SetAttribute(fHistLocalCountInTime, fVPadLocalCountInTime,4);
+    for (int strip=0; strip<=fNumStrips; ++strip)
+      SetAttribute(fHistStripCountInTime[strip], fVPadStripCountInTime,4);
   }
 
   //auto TakeCareOfLabels = [this](TH1* hist)
@@ -588,8 +682,9 @@ void Analysis::SetAttribute(TH1* hist, TVirtualPad* pad, int npad, bool is2D)
     ax -> SetTitleOffset(1.0);
     ay -> SetTitleOffset(1.50);
   }
-  else if (npad>=16)
+  else if (npad>=4)
   {
+    ax -> SetNdivisions(105);
     if (pad!=nullptr) {
       pad -> SetLeftMargin(0.12);
       pad -> SetRightMargin(0.05);
@@ -653,11 +748,12 @@ void Analysis::WriteRunParameters(TFile* file, int option)
 {
   file -> cd();
   (new TNamed("runNo", Form("%d",fRunNo))) -> Write();
+  (new TNamed("beamEnergy", Form("%d",fBeamEnergy))) -> Write();
   if (option==0) {
     (new TNamed("Draw every n-event   :", Form("%d",fUpdateDrawingEveryNEvent))) -> Write();
     (new TNamed("Return if no file    :", Form("%d",fReturnIfNoFile))) -> Write();
     (new TNamed("Ignore file update   :", Form("%d",fIgnoreFileUpdate))) -> Write();
-    (new TNamed("Ignore TS decrease   :", Form("%d",fSkipTSError))) -> Write();
+    (new TNamed("Skip TS decrease     :", Form("%d",fSkipTSError))) -> Write();
     (new TNamed("Event count limit    :", Form("%d",fEventCountLimit))) -> Write();
     (new TNamed("File number range    :", Form("%d %d",fFileNumberRange1,fFileNumberRange2))) -> Write();
     (new TNamed("ADC Threshold        :", Form("%d",fADCThreshold))) -> Write();
@@ -706,7 +802,7 @@ void Analysis::ReadDataFile()
   char buffer[256];
   //int countOpenFileTrials = 0;
 
-  ChannelData* channelData = NULL;
+  ChannelData* ch = NULL;
   fTimeStampPrev = -1;
 
   while (true)
@@ -725,6 +821,7 @@ void Analysis::ReadDataFile()
     fS1ADC = 0.;
     fS3ADC = 0.;
 
+    int eventStatus = kNextEvent;
     while (fDataFile >> buffer)
     {
       fLastDataPos = fDataFile.tellg();
@@ -750,19 +847,11 @@ void Analysis::ReadDataFile()
         else { fHistTSDist2 -> Fill(dts); }
       }
 
-      int eventStatus = kNextEvent;
-      if (!fSkipTSError)
-      {
-        if (timeStamp-fTimeStampPrev<=fCoincidenceTSRange) eventStatus = kSameEvent;
-        else if (timeStamp<fTimeStampPrev) eventStatus = kNextEvent;
-        else if (timeStamp>fTimeStampPrev) eventStatus = kNextEvent;
-      }
-      else
-      {
-        if (timeStamp-fTimeStampPrev<=fCoincidenceTSRange) eventStatus = kSameEvent;
-        else if (timeStamp<fTimeStampPrev) eventStatus = kNextEvent;
-        else if (timeStamp>fTimeStampPrev) eventStatus = kTSError;
-      }
+      if (timeStamp<fTimeStampPrev) eventStatus = kTSError;
+      else if (timeStamp-fTimeStampPrev<=fCoincidenceTSRange) eventStatus = kSameEvent;
+      else eventStatus = kNextEvent;
+
+      fMinuiteBin = timeStamp*fSecondPerTS/60.;
 
       int timeStatus = kSameSecond;
       double dSecond = (timeStamp-fTimeStampLastSec)*fSecondPerTS;
@@ -788,13 +877,17 @@ void Analysis::ReadDataFile()
       }
 
       if (CheckDataLineCondition(adc,eventStatus,timeStamp)==false)
+      {
+        ResetTriggerParameters();
         continue;
+      }
       if (fExitAnalysis)
         break;
 
+
       if (eventStatus==kSameEvent)
       {
-        channelData = (ChannelData*) fChannelArray -> ConstructedAt(fCountChannels++);
+        ch = (ChannelData*) fChannelArray -> ConstructedAt(fCountChannels++);
       }
       else if (eventStatus==kNextEvent)
       {
@@ -807,6 +900,7 @@ void Analysis::ReadDataFile()
         if (fExitAnalysis)
           break;
 
+        ResetEventParameters();
         if (eventIsFilled)
         {
           fCountEvents++;
@@ -830,11 +924,57 @@ void Analysis::ReadDataFile()
 
         fCountChannels = 0;
         fChannelArray -> Clear("C");
-        channelData = (ChannelData*) fChannelArray -> ConstructedAt(fCountChannels++);
+        ch = (ChannelData*) fChannelArray -> ConstructedAt(fCountChannels++);
 
         fTimeStampPrev = timeStamp;
         fTimeStampPrevTrue = timeStamp;
       }
+      else if (eventStatus==kTSError && !fSkipTSError)
+      {
+        bool eventIsFilled = true;
+        if (countEventsSingleFile>0) {
+          eventIsFilled = FillDataTree();
+          if (UpdateDrawing()==false)
+            break;
+        }
+        if (fExitAnalysis)
+          break;
+
+        ResetEventParameters();
+        if (eventIsFilled)
+        {
+          fCountEvents++;
+          countEventsSingleFile++;
+
+          if (timeStatus==kSameSecond) {
+            fCountEventsPerSec++;
+          }
+          else if (timeStatus==kTimeError) {
+            fCountEventsPerSecError++;
+          }
+          else if (timeStatus==fNextSecond)
+          {
+            fHistEventRate -> Fill(fCountEventsPerSec);
+            fHistEventRateError -> Fill(fCountEventsPerSecError);
+            fCountEventsPerSecError = 0;
+            fCountEventsPerSec = 0;
+            fCountEventsPerSec++;
+          }
+        }
+
+        fCountChannels = 0;
+        fChannelArray -> Clear("C");
+        ch = (ChannelData*) fChannelArray -> ConstructedAt(fCountChannels++);
+
+        //fTimeStampPrev = timeStamp;
+        //fTimeStampPrevTrue = timeStamp;
+      }
+      else if (eventStatus==kTSError && fSkipTSError)
+      {
+        continue;
+      }
+
+      // next channel
 
       Short_t midx = GetModuleIndex(FENumber);
       int gid = GetGlobalID(midx, mch);
@@ -843,41 +983,31 @@ void Analysis::ReadDataFile()
           energy = GetCalibratedEnergy(midx,mch,adc);
       auto det = fMapDetectorType[midx][mch];
       auto dch = fMapDetectorChannel[midx][mch];
-      channelData -> SetData(midx,mch,det,dch,gid,adc,energy,tsLocal,tsGroup,timeStamp);
+      ch -> SetData(midx,mch,det,dch,gid,adc,energy,tsLocal,tsGroup,timeStamp);
       fCountAllChannels++;
+      auto dataIndex = fCountChannels-1;
+      if      (fFiredDetector[det]>= 0) fFiredDetector[det] = -2;
+      else if (fFiredDetector[det]==-1) fFiredDetector[det] = dataIndex;
+      fFiredDCh[det][dch] = dataIndex;
 
       if (fdES1CoincidenceMode || fdES1S3CoincidenceMode)
       {
         if (fMapDetectorType[midx][mch]==kS3Junction) {
-          fS3ArrayIdx.push_back(fCountChannels-1);
+          fS3ArrayIdx.push_back(dataIndex);
           fS3ADC = adc;
         }
         if (fMapDetectorType[midx][mch]==kS1Junction) {
-          fS1ArrayIdx.push_back(fCountChannels-1);
+          fS1ArrayIdx.push_back(dataIndex);
           fS1ADC = adc;
         }
         if (fMapDetectorType[midx][mch]==kdEDetector) {
-          fdEArrayIdx.push_back(fCountChannels-1);
+          fdEArrayIdx.push_back(dataIndex);
           fS1ADC = adc;
-        }
-      }
-
-      if (fUpdateDrawingEveryNEvent>=0)
-      {
-        fHistChCount -> Fill(gid);
-        fHistADC -> Fill(adc);
-        fHistAVSCh -> Fill(gid, adc);
-        if (fEnergyConversionIsSet) {
-          fHistEVSCh -> Fill(gid, energy);
-          fHistE -> Fill(energy);
         }
       }
 
       if (fEventCountLimit>0 && fCountEvents>=fEventCountLimit) {
         couti << "Event count limit at " << fCountEvents << "!" << endl;
-#ifdef DEBUG_EXIT_ANALYSIS
-        coutn << "Exit ana: " << "Event count limit at " << fCountEvents << "!" << endl;
-#endif
         fExitAnalysis = true;
       }
     }
@@ -898,6 +1028,15 @@ void Analysis::ReadDataFile()
     fDataFile.close();
 
   UpdateCvsOnline();
+}
+
+void Analysis::ResetTriggerParameters()
+{
+}
+
+void Analysis::ResetEventParameters()
+{
+  ResetFired();
 }
 
 bool Analysis::CheckOpenFileStatus2()
@@ -1051,12 +1190,7 @@ bool Analysis::CheckOpenFileStatus1()
 bool Analysis::CheckDataLineCondition(double adc, int eventStatus, Long64_t timeStamp)
 {
   fCountAllLines++;
-  if (adc < fADCThreshold) {
-#ifdef DEBUG_DATA_LINE_CONDITION
-    if (fCountAskContinueRun==1) coutd << "Bad data: " << adc << " < " << fADCThreshold << endl;
-#endif
-    return false;
-  }
+  if (adc < fADCThreshold) return false;
 
   if (eventStatus==kTSError) // time-stamp decreased
   {
@@ -1067,19 +1201,11 @@ bool Analysis::CheckDataLineCondition(double adc, int eventStatus, Long64_t time
     }
     if (fStopAtTSError) {
       coute << "Exit due to Time-stamp error (" << fCountTSError << ") " << fTimeStampPrev << " -> " << timeStamp << endl;
-#ifdef DEBUG_EXIT_ANALYSIS
-        coutn << "Exit ana: " << "Exit due to Time-stamp error (" << fCountTSError << ") " << fTimeStampPrev << " -> " << timeStamp << endl;
-#endif
       fExitAnalysis = true;
     }
-#ifdef DEBUG_DATA_LINE_CONDITION
-    if (fCountAskContinueRun==1) coutd << "Bad data: " << "TS-Error!" << endl;
-#endif
-    return false;
+    if (fSkipTSError)
+      return false;
   }
-#ifdef DEBUG_DATA_LINE_CONDITION
-  if (fCountAskContinueRun==1) coutd << "Good data" << endl;
-#endif
 
   return true;
 }
@@ -1095,9 +1221,6 @@ bool Analysis::CheckEventCondition(double de, double ee)
     if (fTritonCutG->IsInside(ee,de))
       return true;
     else {
-#ifdef DEBUG_EVENT_LINE_CONDITION
-      coutd << "Bad event: (" << ee << ", " << de << ") is outside of triton cut" << endl;
-#endif
       return false;
     }
   }
@@ -1113,24 +1236,25 @@ bool Analysis::FillDataTree()
   else if (fCountChannels==3) fCoincidenceCount[3]++;
   else if (fCountChannels>=4) fCoincidenceCount[4]++;
 
-  //coutd << fdES1CoincidenceMode << " " << fdES1S3CoincidenceMode << " " << fCoincidenceMultRange1 << endl;
+  int badEventType = 0;
+
+  /////////////////////////////////////////////////////////////////////////
+  // check coincidence cut
   if (fdES1CoincidenceMode) {
-    if (fdEArrayIdx.size()==1 && fS1ArrayIdx.size()==1)
+    //if (fdEArrayIdx.size()==1 && fS1ArrayIdx.size()==1)
+    if (fFiredDetector[kdE]>=0 && fFiredDetector[kS1J]>=0)
       fGoodCoincidenceEvent = true;
     else {
-#ifdef DEBUG_EVENT_LINE_CONDITION
-      coutd << "Bad event: " << fdEArrayIdx.size() << " " << fS1ArrayIdx.size() << endl;
-#endif
+      badEventType = 1;
       fGoodCoincidenceEvent = false;
     }
   }
   else if (fdES1S3CoincidenceMode) {
-    if (fdEArrayIdx.size()==1 && fS1ArrayIdx.size()==1 && fS3ArrayIdx.size()==1 )
+    //if (fdEArrayIdx.size()==1 && fS1ArrayIdx.size()==1 && fS3ArrayIdx.size()==1 )
+    if (fFiredDetector[kdE]>=0 && fFiredDetector[kS1J]>=0 && fFiredDetector[kS3J]>=0)
       fGoodCoincidenceEvent = true;
     else {
-#ifdef DEBUG_EVENT_LINE_CONDITION
-      coutd << "Bad event: " << fdEArrayIdx.size() << " " << fS1ArrayIdx.size() << " " << fS3ArrayIdx.size() << endl;
-#endif
+      badEventType = 2;
       fGoodCoincidenceEvent = false;
     }
   }
@@ -1138,59 +1262,148 @@ bool Analysis::FillDataTree()
     if (fCountChannels>=fCoincidenceMultRange1 && fCountChannels<=fCoincidenceMultRange2)
       fGoodCoincidenceEvent = true;
     else {
-#ifdef DEBUG_EVENT_LINE_CONDITION
-      coutd << "Bad event: mult " << fCountChannels << " not in range " << fCoincidenceMultRange1 << " - " << fCoincidenceMultRange2 << endl;
-#endif
+      badEventType = 3;
       fGoodCoincidenceEvent = false;
     }
   }
   else
     fGoodCoincidenceEvent = true;
 
+  /////////////////////////////////////////////////////////////////////////
+  // check de s1 coincidence
   bdE = -1;
   bESum = -1;
   bE3 = -1;
+  int groupdE = 0;
+  int groupS1 = 0;
   if ((fdES1CoincidenceMode || fdES1CoincidenceMode) && fGoodCoincidenceEvent)
   {
-    auto chdE = (ChannelData*) fChannelArray -> At(fdEArrayIdx[0]);
-    auto chS1 = (ChannelData*) fChannelArray -> At(fS1ArrayIdx[0]);
-    int groupdE = fMapDetectorGroup[chdE->midx][chdE->mch];
-    int groupS1 = fMapDetectorGroup[chS1->midx][chS1->mch];
+    //auto chdE = (ChannelData*) fChannelArray -> At(fdEArrayIdx[0]);
+    //auto chS1 = (ChannelData*) fChannelArray -> At(fS1ArrayIdx[0]);
+    auto chdE = (ChannelData*) fChannelArray -> At(fFiredDetector[kS1J]);
+    auto chS1 = (ChannelData*) fChannelArray -> At(fFiredDetector[kS3J]);
+    auto S1dCh = chS1->dch;
+    groupdE = fMapDetectorGroup[chdE->midx][chdE->mch];
+    groupS1 = fMapDetectorGroup[chS1->midx][chS1->mch];
     bdE = chdE->energy;
     bESum = chdE->energy + chS1->energy;
-    if (groupdE==groupS1) {
-      fHistdAVSA -> Fill(chdE->adc,    chdE->adc    + chS1->adc);
-      fHistdEVSE -> Fill(chdE->energy, chdE->energy + chS1->energy);
-    }
-    if (fS3ArrayIdx.size()==1)
+    if (groupdE==groupS1)
     {
-      auto chS3 = (ChannelData*) fChannelArray -> At(fS3ArrayIdx[0]);
-      int groupS3 = fMapDetectorGroup[chS3->midx][chS3->mch];
-      bE3 = chdE->energy + chS3->energy;
+      fHistdAVSA -> Fill(chdE->adc, chdE->adc+chS1->adc);
+      fHistdEVSE -> Fill(bdE, bESum);
+      auto strip = fMapS1ChToStrip[chS1->dch];
+      fHistEVSStrip -> Fill(bESum,strip);
+
+      //if (fS3ArrayIdx.size()==1)
+      if (fFiredDetector[kS3J]>=0)
+      {
+        auto chS3 = (ChannelData*) fChannelArray -> At(fFiredDetector[kS3J]);
+        bE3 = chS3->energy;
+      }
+
+      fdEArrayIdx.clear();
+      fS1ArrayIdx.clear();
+      fS3ArrayIdx.clear();
+      fdEADC = 0.;
+      fS1ADC = 0.;
+      fS3ADC = 0.;
+
+      if (fTritonCutGIsSet)
+      {
+        auto detectorTheta = fMapS1ChToAngle[S1dCh];
+        if (fBeamEnergy==0)
+          coute << "Beam energy is not set!!!" << endl;
+        auto ex = EvalEx(fBeamEnergy, bESum, detectorTheta);
+        fHistEx -> Fill(ex);
+      }
     }
-    fdEArrayIdx.clear();
-    fS1ArrayIdx.clear();
-    fS3ArrayIdx.clear();
-    fdEADC = 0.;
-    fS1ADC = 0.;
-    fS3ADC = 0.;
+    else {
+      badEventType = 4;
+      fGoodCoincidenceEvent = false;
+    }
   }
+  /////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG_EVENT_LINE_CONDITION
+      if (badEventType==1)
+        coutd << Form("Bad event: Too much fired channel dE(%d) S1(%d)",fdEArrayIdx.size(),fS1ArrayIdx.size());
+      if (badEventType==2)
+        coutd << Form("Bad event: Too much fired channel dE(%d) S1(%d) S3(%d)",
+                      fdEArrayIdx.size(),fS1ArrayIdx.size(),fS3ArrayIdx.size());
+      if (badEventType==3)
+        coutd << Form("Bad event: mult %d out of %d - %d",
+                      fCountChannels,fCoincidenceMultRange1,fCoincidenceMultRange2);
+      if (badEventType==4)
+        coutd << Form("Bad event: dE(%d), S1(%d) are not in same group!",groupdE,groupS1) << endl;
+#endif
 
   if (CheckEventCondition(bdE, bESum)==false)
     return false;
 
-  if (fTritonCutGIsSet)
+  if (fUpdateDrawingEveryNEvent>=0)
   {
-    //auto detectorTheta;
-    //auto ex = EvalEx(fBeamEnergy, bESum, detectorTheta);
-    //fHistEx -> Fill(ex);
+    for (auto iChannel=0; iChannel<fChannelArray->GetEntries(); ++iChannel)
+    {
+      auto ch = (ChannelData*) fChannelArray -> At(iChannel);
+      fHistChCount -> Fill(ch->gid);
+      fHistADC -> Fill(ch->adc);
+      fHistAVSCh -> Fill(ch->gid, ch->adc);
+      if (fEnergyConversionIsSet) {
+        fHistEVSCh -> Fill(ch->gid, ch->energy);
+        fHistE -> Fill(ch->energy);
+      }
+    }
   }
+
+  FillLocalHistograms();
 
   bTimeStamp = fTimeStampPrev;
   bNumChannels = fCountChannels;
   fTreeOut -> Fill();
 
   return true;
+}
+
+void Analysis::FillLocalHistograms()
+{
+  fHistEventCountInTime -> Fill(fMinuiteBin);
+  if (fChosenDCh>=0) {
+    while (true) {
+      auto dataIndex = fFiredDCh[fChosenDet][fChosenDCh];
+      if (dataIndex<0)
+        break;
+      auto ch = (ChannelData*) fChannelArray -> At(dataIndex);
+      auto energy = ch -> energy;
+      if (fEnergyRange1>0 && energy<fEnergyRange1 && energy>fEnergyRange2)
+        break;
+      fHistLocalCountInTime -> Fill(fMinuiteBin);
+      break;
+    }
+  }
+  else if (fEnergyRange1>0)
+  {
+  for (auto iChannel=0; iChannel<fChannelArray->GetEntries(); ++iChannel)
+    {
+      auto ch = (ChannelData*) fChannelArray -> At(iChannel);
+      if (ch->energy>=fEnergyRange1 && ch->energy<=fEnergyRange2) {
+        fHistLocalCountInTime -> Fill(fMinuiteBin);
+        break;
+      }
+    }
+  }
+  else {
+    fHistLocalCountInTime -> Fill(fMinuiteBin);
+  }
+
+  for (auto iChannel=0; iChannel<fChannelArray->GetEntries(); ++iChannel)
+  {
+    auto ch = (ChannelData*) fChannelArray -> At(iChannel);
+    if (ch->det==kS1J) {
+      auto strip = fMapS1ChToStrip[ch->dch];
+      if (fEnergyRange1>0 && ch->energy>=fEnergyRange1 && ch->energy<=fEnergyRange2)
+        fHistStripCountInTime[strip] -> Fill(fMinuiteBin);
+    }
+  }
 }
 
 Long64_t Analysis::GetFileSize(TString fileName)
@@ -1360,7 +1573,7 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
   if (fUpdateDrawingEveryNEvent<=0)
     return;
 
-  if (fCvsOnline1==nullptr)
+  if (fCvsOnline==nullptr)
     return;
 
   auto DrawModuleBoundary = [this](double yMax) {
@@ -1391,9 +1604,9 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
     }
   };
 
-  if (fPadTrgRate==fPadEvtRate)
+  if (fVPadTriggerRate==fVPadEventRate)
   {
-    fPadTrgRate -> cd();
+    fVPadTriggerRate -> cd();
     //double maxTrigger = fHistTriggerRate->GetBinContent(fHistTriggerRate->GetMaximumBin());
     //double maxEvent = fHistEventRate->GetBinContent(fHistEventRate->GetMaximumBin());
     //if (maxTrigger<maxEvent)
@@ -1407,37 +1620,85 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
     fHistEventRateError -> Draw("same");
   }
   else {
-    fPadTrgRate -> cd();
+    fVPadTriggerRate -> cd();
     fHistTriggerRate -> Draw();
     fHistTriggerRateError -> Draw("same");
-    fPadEvtRate -> cd();
+    fVPadEventRate -> cd();
     fHistEventRate -> Draw();
     fHistEventRateError -> Draw("same");
   }
 
-  fPadTSDist1 -> cd();
-  fHistTSDist1 -> Draw();
-  if (fPadTSDist2!=nullptr)
+  double minuiteBinMax = fMinuiteBin+3;
+  if      (minuiteBinMax<8) minuiteBinMax = 10;
+  else if (minuiteBinMax<18) minuiteBinMax = 25;
+  else if (minuiteBinMax<30) minuiteBinMax = 50;
+  else if (minuiteBinMax<70) minuiteBinMax = 100;
+  else if (minuiteBinMax<110) minuiteBinMax = 150;
+  else if (minuiteBinMax<150) minuiteBinMax = 200;
+  else if (minuiteBinMax<220) minuiteBinMax = 300;
+  fVPadBeamCountInTime -> cd();
+  fHistBeamCountInTime -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
+  fHistBeamCountInTime -> Draw();
+  fVPadEventCountInTime -> cd();
+  fHistEventCountInTime -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
+  fHistEventCountInTime -> Draw();
+  fVPadLocalCountInTime -> cd();
+  fHistLocalCountInTime -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
+  fHistLocalCountInTime -> Draw();
+  fVPadStripCountInTime -> cd();
+
+  double yMaxStrip = 0;
+  for (int strip=1; strip<=fNumStrips; ++strip) {
+    auto hist = fHistStripCountInTime[strip];
+    auto max = hist -> GetBinContent(hist -> GetMaximumBin());
+    if (max>yMaxStrip)
+      yMaxStrip = max;
+  }
+  fHistStripCountInTime[0] -> SetMaximum(yMaxStrip*1.2);
+  fHistStripCountInTime[0] -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
+  fHistStripCountInTime[0] -> Draw();
+  auto legend = new TLegend(0.8,0.15,0.95,0.85);
+  legend -> SetBorderSize(0);
+  legend -> SetFillStyle(0);
+  //legend -> SetTextSize(0.05);
+  legend -> AddEntry("","strip","");
+  int nn = fS1ChosenS1Strips.size();
+  if (nn==0)
   {
-    fPadTSDist2 -> cd();
+    for (int strip=1; strip<=fNumStrips; ++strip) {
+      fHistStripCountInTime[strip] -> Draw("same");
+      legend -> AddEntry(fHistStripCountInTime[strip],Form("%d",strip),"l");
+    }
+  }
+  else {
+    for (int iStrip=0; iStrip<nn; ++iStrip) {
+      auto strip = fS1ChosenS1Strips[iStrip];
+      fHistStripCountInTime[strip] -> Draw("same");
+      legend -> AddEntry(fHistStripCountInTime[strip] ,Form("%d",strip),"l");
+    }
+  }
+  legend -> Draw("same");
+
+  fVPadTSDist1 -> cd();
+  fHistTSDist1 -> Draw();
+  if (fVPadTSDist2!=nullptr)
+  {
+    fVPadTSDist2 -> cd();
     fHistTSDist2 -> Draw();
   }
 
-  //fCvsOnline1 -> cd(1);
-  fPadChCount -> cd();
+  fVPadChCount -> cd();
   fHistChCount -> Draw();
   DrawModuleBoundary(fHistChCount->GetMaximum()*1.05);
   TakeCareOfStatsBox(fHistChCount);
 
-  //fCvsOnline1 -> cd(2);
-  fPadADC -> cd();
+  fVPadADC -> cd();
   TH1D* histEOnline = fHistADC;
   if (fShowEnergyConversion)
     histEOnline = fHistE;
   histEOnline -> Draw();
 
-  //fCvsOnline1 -> cd(3);
-  fPadEVSCh -> cd();
+  fVPadEVSCh -> cd();
   TH2D* hist2DOnline = fHistAVSCh;
   double yMax = fMaxADC;
   if (fShowEnergyConversion) {
@@ -1448,29 +1709,27 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
   DrawModuleBoundary(yMax);
   TakeCareOfStatsBox(hist2DOnline);
 
-  //fCvsOnline1 -> cd(4);
-  fPaddEVSE -> cd();
+  fVPaddEVSE -> cd();
   TH2D* histdEEOnline = fHistdAVSA;
   if (fShowEnergyConversion) {
     histdEEOnline = fHistdEVSE;
   }
   histdEEOnline -> Draw("colz");
 
-  fPadEx -> cd();
+  fVPadEVSStrip -> cd();
+  fHistEVSStrip -> Draw("colz");
+
+  fVPadEx -> cd();
   fHistEx -> Draw();
 
-  if (fCvsOnline2!=nullptr) {
-    fCvsOnline2 -> Modified();
-    fCvsOnline2 -> Update();
-  }
-  fCvsOnline1 -> Modified();
-  fCvsOnline1 -> Update();
+  fCvsOnline -> Modified();
+  fCvsOnline -> Update();
 }
 
 bool Analysis::CheckStopFile()
 {
   if (access("stop",F_OK)!=-1) {
-    coutd << "found stop file" << endl;
+    coutn << "found stop file" << endl;
     coutn << "Please remove stop file!" << endl;
     coutn << "Please remove stop file!" << endl;
     coutn << "Please remove stop file!" << endl;
@@ -1489,10 +1748,10 @@ void Analysis::EndOfConversion()
   couti << "Writting tree ..." << endl;
   fTreeOut -> Write();
 
-  if (fCvsOnline1!=nullptr)
+  if (fCvsOnline!=nullptr)
   {
     UpdateCvsOnline();
-    fCvsOnline1 -> Write();
+    fCvsOnline -> Write();
   }
   fHistChCount -> Write();
   fHistADC -> Write();
@@ -1567,59 +1826,42 @@ double Analysis::GetCalibratedEnergy(int midx, int mch, int adc)
   return fFxEnergyConversion[midx][mch] -> Eval(adc);
 }
 
-void Analysis::MakeTritonCutFile(TString fileName)
+void Analysis::MakeCutGFile(int pdt)
 {
-  if (fileName.IsNull())
-    fileName = "tritonCutG.root";
-  fileName = getAna()->GetOutputPath() + fileName;
+  TString name;
+  if      (pdt==1) name = "cutGProton";
+  else if (pdt==2) name = "cutGTriton";
+  else if (pdt==3) name = "cutGDeuteron";
+  TString fileName = getAna()->GetOutputPath() + name + ".root";
+  //if (getAna()->fRunNo>0) fileName = getAna()->GetOutputPath() + Form("RUN%03d.") + name + ".root";
   cout << "Creating " << fileName << endl;
   auto file = new TFile(fileName,"recreate");
-  TCutG* tritonCutG = (TCutG*) gROOT->GetListOfSpecials()->FindObject("CUTG");
-  tritonCutG -> SetName("tritonCutG");
+  TCutG* cutG = (TCutG*) gROOT->GetListOfSpecials()->FindObject("CUTG");
+  cutG -> SetName(name);
   file -> cd();
-  tritonCutG -> SetVarX("de");
-  tritonCutG -> SetVarY("ee");
-  //tritonCutG -> SetVarX("ch.gid");
-  //tritonCutG -> SetVarY("ch.energy");
-  
-  
-  tritonCutG -> Write();
+  cutG -> SetVarX("de");
+  cutG -> SetVarY("ee");
+  cutG -> Write();
 }
 
-void Analysis::CallTritonCutFile(TString fileName)
+void Analysis::CallCutGFile(int pdt)
 {
-  if (fileName.IsNull())
-    fileName = "out/tritonCutG.root";
-  couti << "Set triton graphic cut from " << fileName << endl;
+  TString name;
+  if      (pdt==1) name = "cutGProton";
+  else if (pdt==2) name = "cutGTriton";
+  else if (pdt==3) name = "cutGDeuteron";
+  TString fileName = getAna()->GetOutputPath() + name + ".root";
+  couti << "Set graphic cut from " << fileName << " >> " << name << endl;
 
   TDirectory* currentDirectory;
   if (gDirectory!=nullptr)
     currentDirectory = gDirectory;
   TFile* file = new TFile(fileName,"read");
-  TCutG* tritonCutG = (TCutG*) file -> Get("tritonCutG");
+  TCutG* tritonCutG = (TCutG*) file -> Get(name);
   tritonCutG -> SetVarX("de");
   tritonCutG -> SetVarY("ee");
-  //tritonCutG -> SetVarX("ch.gid");
-  //tritonCutG -> SetVarY("ch.energy");
   if (currentDirectory!=nullptr)
     currentDirectory -> cd();
-}
-
-void Analysis::SetTritonCutFile(TString fileName)
-{
-  couti << "Set triton graphic cut from " << fileName << endl;
-
-  TFile* file = new TFile(fileName,"read");
-  if (file->IsZombie()) {
-    coute << fileName << " is zombie!!" << endl;
-    return;
-  }
-
-  fTritonCutG = (TCutG*) file -> Get("tritonCutG");
-  fTritonCutG -> SetVarX("de");
-  fTritonCutG -> SetVarY("ee");
-
-  fTritonCutGIsSet = true;
 }
 
 const double mp = 938.791;

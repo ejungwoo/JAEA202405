@@ -6,5 +6,8 @@
 [o] online check update file after reading
 [o] make flag file so to break from auto update > create file named "stop" to stop auto running program
 [?] de vs s1+de
-[ ] triton gate -> energy distribution
-[ ] excitation energy
+[?] triton gate -> energy distribution
+[?] excitation energy
+[ ] beam count vs time 
+[?] deutron count vs time 
+[?] deutron count / beam count vs time 

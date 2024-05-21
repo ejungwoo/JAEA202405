@@ -1,25 +1,34 @@
-void run_conversion(int runNo=-1)
+void run_conversion(int runNo=-1, double energy=-1)
 {
   if (runNo<0 && gApplication->Argc()>=5 && TString(gApplication->Argv()[4]).IsDec())
     runNo = TString(gApplication->Argv()[4]).Atoi();
+  if (runNo<0 && gApplication->Argc()>=6 && TString(gApplication->Argv()[5]).IsFloat())
+    energy = TString(gApplication->Argv()[4]).Atof();
   if (runNo<0) { cout << "runNo is not given!" << endl; return; }
 
   auto ana = new Analysis();
+  ana -> SetPathToInput("/home/daquser/data/LiCD2Irrad/");
+  ana -> SetPathToOutput("/home/daquser/data/LiCD2Irrad/analysis/out/");
+  ana -> SetMapFileName("/home/daquser/data/LiCD2Irrad/analysis/ModCh.in");
+  ana -> SetDetFileName("/home/daquser/data/LiCD2Irrad/analysis/DetectorSetting.in");
 
+  // general
   ana -> SetReturnIfNoFile(true);
   ana -> SetIgnoreFileUpdate(false);
   ana -> SetAutoUpdateDrawing(true);
   ana -> SetAutoUpdateRun(false);
-  ana -> SetDrawOnline(50000);
-  //ana -> SetDrawOnline(1000000);
-
-  ana -> AddAlphaCalibrationFile("out/RUN011.alpha.root");
-  ana -> AddAlphaCalibrationFile("out/RUN015.alpha.root");
-  ana -> SetShowEnergyConversion(false);
-
+  ana -> SetDrawOnline(100000);
   ana -> SetSkipTSError(false);
   ana -> SetStopAtTSError(false);
   ana -> SetADCThreshold(500);
+  //ana -> SetEventCountLimit(1000);
+  //ana -> SetFileNumberRange(0,10);
+  //ana -> SetDrawOnline(1000000);
+
+  // alpha calibration
+  ana -> AddAlphaCalibrationFile("out/RUN011.alpha.root");
+  ana -> AddAlphaCalibrationFile("out/RUN015.alpha.root");
+  ana -> SetShowEnergyConversion(false);
 
   //ana -> SetCoincidenceTSRange(1);
   //ana -> SetTritonCutFile("out/tritonCutG.root");
@@ -27,9 +36,16 @@ void run_conversion(int runNo=-1)
   //ana -> SetdES1Coincidence(true);
   //ana -> SetdES1S3Coincidence(true);
 
-  //ana -> SetEventCountLimit(100);
-  //ana -> SetFileNumberRange(0,10);
+  // conditions for local histograms (which will not affect event collection)
+  ana -> SetLocalEnergyRange(4,6);
+  ana -> SetLocalDetectorChannelCut(kS1J,10);
+  ana -> AddLocalS1StripHist(2);
+  ana -> AddLocalS1StripHist(4);
+  ana -> AddLocalS1StripHist(8);
+  ana -> AddLocalS1StripHist(12);
+  ana -> AddLocalS1StripHist(16);
 
   //ana -> SetConversionFile("dummy.root");
-  ana -> RunConversion(runNo,"/home/daquser/data/LiCD2Irrad/");
+  //ana -> SetBeamEnergy(energy);
+  ana -> RunConversion(runNo);
 }
