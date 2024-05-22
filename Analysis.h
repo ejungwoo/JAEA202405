@@ -103,7 +103,7 @@ class Analysis
     void ReadDataFile();
     bool FillDataTree();
     void EndOfConversion();
-    void PrintConversionSummary();
+    void PrintConversionSummary(TFile* file=(TFile*)nullptr);
 
     void ResetTriggerParameters();
     void ResetEventParameters();
@@ -121,7 +121,7 @@ class Analysis
     TString fInputFileName;
 
     void WriteRunParameters(TFile* file, int option);
-    void UpdateCvsOnline(bool firstDraw=false, bool write=false);
+    void UpdateCvsOnline(bool firstDraw=false, TFile* file=(TFile*)nullptr);
     bool CheckStopFile();
     void SetAttribute(TH1* hist, TVirtualPad* pad, int npad=1, bool is2D=false);
     void SetAttribute(TH1* hist, int npad=1, bool is2D=false) { SetAttribute(hist, (TVirtualPad*)nullptr, npad, is2D); }
@@ -147,8 +147,6 @@ class Analysis
     TVirtualPad* fVPadEVSS3Strip = nullptr;
     TVirtualPad* fVPadEVSAngle   = nullptr;
     TVirtualPad* fVPaddEVSE   = nullptr;
-    TVirtualPad* fVPadTriggerRate = nullptr;
-    TVirtualPad* fVPadEventRate = nullptr;
     TVirtualPad* fVPadBeamCountInTime = nullptr;
     TVirtualPad* fVPadEventCountInTime = nullptr;
     TVirtualPad* fVPadLocalCountInTime = nullptr;
@@ -187,10 +185,6 @@ class Analysis
     TH2D* fHistdEVSE = nullptr;
     //TH2D* fHistEVSStrip = nullptr;
 
-    TH1D* fHistTriggerRate = nullptr;
-    TH1D* fHistTriggerRateError = nullptr;
-    TH1D* fHistEventRate = nullptr;
-    TH1D* fHistEventRateError = nullptr;
     TH1D* fHistEx = nullptr;
 
     bool fShowEnergyConversion = false;
@@ -298,8 +292,8 @@ class Analysis
 
   public:
     static void MakeCutGFile(int pdt);
+    static void MakeCutGFile(TString name);
     static void CallCutGFile(int pdt);
-    //void GetCutGFile(int pdt);
     void SetExcludeDESECutGFile(TString fileName);
     void SetEnergyCutGFile(TString fileName);
 
@@ -404,13 +398,6 @@ class Analysis
     Short_t fChosenDet = -1;
     Short_t fChosenDCh = -1;
     vector<int> fS1ChosenS1Strips;
-
-    vector<int> fdEArrayIdx;
-    vector<int> fS1ArrayIdx;
-    vector<int> fS3ArrayIdx;
-    double fdEADC = 0;
-    double fS1ADC = 0;
-    double fS3ADC = 0;
 
     bool fEnergyConversionIsSet = false;
     TF1* fFxEnergyConversion[NUMBER_OF_MODULES][NUMBER_OF_CHANNELS];
