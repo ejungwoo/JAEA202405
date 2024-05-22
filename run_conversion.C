@@ -17,11 +17,11 @@ void run_conversion(int runNo=-1, double energy=-1)
   ana -> SetIgnoreFileUpdate(true);
   ana -> SetAutoUpdateDrawing(true);
   ana -> SetAutoUpdateRun(true);
-  ana -> SetDrawOnline(100000);
+  ana -> SetDrawOnline(400000);
   ana -> SetSkipTSError(false);
   ana -> SetStopAtTSError(false);
   ana -> SetADCThreshold(50);
-  //ana -> SetEventCountLimit(117);
+  //ana -> SetEventCountLimit(1000000);
   //ana -> SetLineCountLimit(125);
   //ana -> SetFileNumberRange(0,10);
   //ana -> SetDrawOnline(1000000);
@@ -38,13 +38,16 @@ void run_conversion(int runNo=-1, double energy=-1)
   //ana -> SetdES1S3Coincidence(true);
 
   // conditions for local histograms (which will not affect event collection)
+  //ana -> SetLocalDetectorChannelCut(kS1J,10);
   ana -> SetLocalEnergyRange(4,6);
-  ana -> SetLocalDetectorChannelCut(kS1J,10);
-  ana -> AddLocalS1StripHist(2);
+  ana -> AddLocalS1StripHist(1);
   ana -> AddLocalS1StripHist(4);
   ana -> AddLocalS1StripHist(8);
-  ana -> AddLocalS1StripHist(12);
-  ana -> AddLocalS1StripHist(16);
+  //ana -> AddLocalS1StripHist(12);
+
+  //ant -> SetExcludeDESECutGFile();
+  ana -> SetEnergyCutGFile("out/cutG5.root"); // CD2
+  //ana -> SetEnergyCutGFile("out/cutG7.root"); // CH2
 
   //ana -> SetConversionFile("dummy.root");
   //ana -> SetBeamEnergy(energy);

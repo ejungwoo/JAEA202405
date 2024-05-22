@@ -78,6 +78,7 @@ class Analysis
       fCoincidenceMultRange1 = r1;
       fCoincidenceMultRange2 = r2;
     }
+    void SetfExcludedES1Coincidence(bool value) { fExcludedES1Coincidence = value; }
     void SetdES1Coincidence(bool value) {
       fCoincidenceMultRange1 = -1;
       fCoincidenceMultRange2 = -1;
@@ -120,7 +121,7 @@ class Analysis
     TString fInputFileName;
 
     void WriteRunParameters(TFile* file, int option);
-    void UpdateCvsOnline(bool firstDraw=false);
+    void UpdateCvsOnline(bool firstDraw=false, bool write=false);
     bool CheckStopFile();
     void SetAttribute(TH1* hist, TVirtualPad* pad, int npad=1, bool is2D=false);
     void SetAttribute(TH1* hist, int npad=1, bool is2D=false) { SetAttribute(hist, (TVirtualPad*)nullptr, npad, is2D); }
@@ -152,6 +153,7 @@ class Analysis
     TVirtualPad* fVPadEventCountInTime = nullptr;
     TVirtualPad* fVPadLocalCountInTime = nullptr;
     TVirtualPad* fVPadStripCountInTime = nullptr;
+    TVirtualPad* fVPadRatioCountInTime = nullptr;
     TVirtualPad* fVPadTSDist1 = nullptr;
     TVirtualPad* fVPadTSDist2 = nullptr;
     //TVirtualPad* fVPadEVSStrip = nullptr;
@@ -164,6 +166,7 @@ class Analysis
     TH1D* fHistEventCountInTime = nullptr;
     TH1D* fHistLocalCountInTime = nullptr;
     TH1D* fHistStripCountInTime[17];
+    TH1D* fHistRatioCountInTime[17];
     TH1D* fHistProtonCountInTime = nullptr;
     TH1D* fHistDeuteronCountInTime = nullptr;
     TH1D* fHistTritonCountInTime = nullptr;
@@ -217,11 +220,11 @@ class Analysis
     const int    fNumCh = NUMBER_OF_MODULES*NUMBER_OF_CHANNELS;
     const int    fMaxCh = NUMBER_OF_MODULES*NUMBER_OF_CHANNELS;
 
-    int          fNumE = 8000;
+    int          fNumE = 400;
     const double fMaxE = 25;
-    const int    fNumdE = 8000;
+    const int    fNumdE = 400;
     const double fMaxdE = 12;
-    int          fNumEE = 8000;
+    int          fNumEE = 400;
     const double fMaxEE = 35;
 
     const int    fNumStrips = 16;
@@ -230,8 +233,10 @@ class Analysis
     const int    fNumRate = 200;
     const int    fMaxRate = 5000;
 
-    const int    fNumEx = 1000;
+    const int    fNumEx = 500;
     const int    fMaxEx = 15;
+
+    const int    fMaxTime = 60*6;
 
     const double fSecondPerTS = 200.*1.e-9;
     const double fTSPerSecton = 1./(200.*1.e-9);
@@ -294,13 +299,20 @@ class Analysis
   public:
     static void MakeCutGFile(int pdt);
     static void CallCutGFile(int pdt);
+    //void GetCutGFile(int pdt);
+    void SetExcludeDESECutGFile(TString fileName);
+    void SetEnergyCutGFile(TString fileName);
 
   public:
     double EvalEx(double tp, double tt, double theta);
 
   private:
     bool fTritonCutGIsSet = false;
+    TCutG* fProtonCutG = nullptr;
+    TCutG* fDeuteronCutG = nullptr;
     TCutG* fTritonCutG = nullptr;
+    TCutG* fExcludeDESECutG = nullptr;
+    TCutG* fEnergyCutG = nullptr;
 
    public:
     void SetRunNo(int val) { fRunNo = val; }
@@ -329,6 +341,8 @@ class Analysis
     UShort_t fDataFileNumber;
 
     Long64_t fCountEvents = 0;
+    Long64_t fCountBeam = 0;
+
     Long64_t fEventCountLimit = -1;
     Long64_t fLineCountLimit = -1;
     Long64_t fLastDataPos;
@@ -370,6 +384,7 @@ class Analysis
     const int fNumChannels = NUMBER_OF_CHANNELS;
 
     TClonesArray *fChannelArray = nullptr;
+    bool  fExcludedES1Coincidence = false;
     bool  fdES1CoincidenceMode = false;
     bool  fdES1S3CoincidenceMode = false;
     bool  fGoodCoincidenceEvent = false;

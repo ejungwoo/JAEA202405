@@ -513,9 +513,10 @@ void Analysis::InitializeDrawing()
     //fCvsOnline2 = new TCanvas("cvsOnline2",fRunName+" online update canvas 2",60,60,1300,800); 
     //fCvsOnline2 -> Divide(2,2);
 
-    fCvsOnline = new TCanvas("cvsOnline",fRunName+" online update canvas 1",30,30,1850,800);
-    fCvsOnline -> SetMargin(0,0,0,0);
-    fCvsOnline -> Divide(4,2,0,0);
+    //fCvsOnline = new TCanvas("cvsOnline",fRunName+" online update canvas 1",30,30,1850,800);
+    fCvsOnline = new TCanvas("cvsOnline",fRunName+" online update canvas 1",30,30,1600,900);
+    fCvsOnline -> SetMargin(0.05,0.05,0.05,0.05);
+    fCvsOnline -> Divide(3,2,0,0);
 
                       //fCvsOnline -> cd(2) -> SetMargin(0,0,0,0);
                       fCvsOnline -> cd(2) -> Divide(2,2,0,0);
@@ -528,22 +529,25 @@ void Analysis::InitializeDrawing()
                            fCvsOnline -> cd(3) -> Divide(1,2,0,0);
     fVPadBeamCountInTime  = fCvsOnline -> cd(3) -> cd(1);
     fVPadEventCountInTime = fCvsOnline -> cd(3) -> cd(2);
-                           fCvsOnline -> cd(4) -> Divide(1,2,0,0);
-    fVPadLocalCountInTime = fCvsOnline -> cd(4) -> cd(1);
-    fVPadStripCountInTime = fCvsOnline -> cd(4) -> cd(2);
+                            fCvsOnline -> cd(6) -> Divide(1,2,0,0);
+    fVPadStripCountInTime = fCvsOnline -> cd(6) -> cd(1);
+    fVPadRatioCountInTime = fCvsOnline -> cd(6) -> cd(2);
+    //fVPadRatioCountInTime -> SetGridy();
+    //fVPadLocalCountInTime = fCvsOnline -> cd(4) -> cd(2);
 
     fVPadChCount  = fCvsOnline -> cd(1);
     fVPadADC      = fCvsOnline -> cd(5);
-    fVPadEVSCh    = fCvsOnline -> cd(5);
-    fVPadEVSAngle    = fCvsOnline -> cd(6);
+    fVPadEVSCh    = fCvsOnline -> cd(4);
+    fVPadEVSAngle = fCvsOnline -> cd(5);
+    fVPadEVSAngle -> SetLogz();
 
     //fVPadEVSS1Strip  = fCvsOnline -> cd(7);
     //fVPadEVSS3Strip  = fCvsOnline -> cd(8);
 
-    fVPaddEVSE    = fCvsOnline -> cd(7);
-    fVPadEx       = fCvsOnline -> cd(8);
+    //fVPaddEVSE    = fCvsOnline -> cd(7);
+    //fVPadEx       = fCvsOnline -> cd(8);
     //fVPadEVSStrip = fCvsOnline2 -> cd(2);
-    //fVPadEVSCh   -> SetLogz();
+    fVPadEVSCh   -> SetLogz();
     //fVPaddEVSE   -> SetLogz();
   }
 
@@ -554,42 +558,60 @@ void Analysis::InitializeDrawing()
   fHistTriggerRate      -> SetLineColor(kBlack);
   fHistTriggerRateError -> SetLineColor(kBlack);
 
-  TString titleLC = "Local count";
-  if (fChosenDet>=0 && fEnergyRange1>0) {
-    titleLC = Form("[%s-%d]  %.2f < energy < %.2f (MeV)",
-                   fEnergyRange1,fEnergyRange2,fDetectorName[fChosenDet].Data(),fChosenDCh);
-  }
-  else if (fChosenDet>=0)
-    titleLC = Form("[%s-%d]",fDetectorName[fChosenDet].Data(),fChosenDCh);
-  else if (fEnergyRange1>0)
-    titleLC = Form("%.2f < energy < %.2f (MeV)",fEnergyRange1,fEnergyRange2);
+  TString titleLC;
+  TString titleSC = "strip count";
+  TString titleRC = "strip/beam";
+  //titleLC = "Local count";
+  //titleSC = "Strip count";
+  //if (fChosenDet>=0 && fEnergyRange1>0) {
+  //  titleLC = Form("[%s-%d]  %.2f < energy < %.2f (MeV)",
+  //                 fEnergyRange1,fEnergyRange2,fDetectorName[fChosenDet].Data(),fChosenDCh);
+  //}
+  //else if (fChosenDet>=0) titleLC = Form("[%s-%d]",fDetectorName[fChosenDet].Data(),fChosenDCh);
+  //else if (fEnergyRange1>0) titleLC = Form("%.2f < energy < %.2f (MeV)",fEnergyRange1,fEnergyRange2);
+  //if (fEnergyRange1>0) titleSC = Form("%.2f < energy < %.2f (MeV)",fEnergyRange1,fEnergyRange2);
 
-  TString titleSC = "Strip count";
-  if (fEnergyRange1>0)
-    titleSC = Form("%.2f < energy < %.2f (MeV)",fEnergyRange1,fEnergyRange2);
-
-  int maxTime = 200;
-  fHistBeamCountInTime  = new TH1D("histBeamCountInTime","beam count;time (min);count",maxTime,0,maxTime);
-  fHistLocalCountInTime = new TH1D("histLocalCountInTime",titleLC+";time (min);count",maxTime,0,maxTime);
-  fHistEventCountInTime = new TH1D("histEventCountInTime","event count;time (min);count",maxTime,0,maxTime);
+  fHistBeamCountInTime  = new TH1D("histBeamCountInTime","beam count;time (min);count",fMaxTime,0,fMaxTime);
+  fHistBeamCountInTime  -> SetFillColor(29);
+  fHistBeamCountInTime  -> SetLineColor(kBlue);
+  fHistLocalCountInTime = new TH1D("histLocalCountInTime",titleLC+";time (min);count",fMaxTime,0,fMaxTime);
+  fHistEventCountInTime = new TH1D("histEventCountInTime","event count;time (min);count",fMaxTime,0,fMaxTime);
   fHistEventCountInTime -> SetFillColor(29);
-  fHistStripCountInTime[0] = new TH1D("histStripCountInTime",titleSC+";time (min);count",maxTime,0,maxTime);
+
+  fHistStripCountInTime[0] = new TH1D("histStripCountInTime",titleSC+";time (min);count",fMaxTime,0,fMaxTime);
   fHistStripCountInTime[0] -> SetStats(0);
-  for (int strip=1; strip<=fNumStrips; ++strip) {
+  fHistRatioCountInTime[0] = new TH1D("histRatioCountInTime",titleRC+";time (min);count",fMaxTime,0,fMaxTime);
+  fHistRatioCountInTime[0] -> SetStats(0);
+
+  int numChosenS1Strips = fS1ChosenS1Strips.size();
+  if (numChosenS1Strips==0)
+    fS1ChosenS1Strips.push_back(1);
+  numChosenS1Strips = fS1ChosenS1Strips.size();
+  for (int iStrip=0; iStrip<numChosenS1Strips; ++iStrip) {
+    auto strip = fS1ChosenS1Strips[iStrip];
     auto name = Form("histStrip%dCIT",strip);
     auto title = Form("strip %d count;time (min);count",strip);
-    fHistStripCountInTime[strip] = new TH1D(name,title,maxTime,0,maxTime);
+    fHistStripCountInTime[strip] = new TH1D(name,title,fMaxTime,0,fMaxTime);
     fHistStripCountInTime[strip] -> SetLineColor(strip);
+    name = Form("histRatio%dCIT",strip);
+    title = Form("strip %d count;time (min);count",strip);
+    fHistRatioCountInTime[strip] = new TH1D(name,title,fMaxTime,0,fMaxTime);
+    fHistRatioCountInTime[strip] -> SetLineColor(strip);
     if (strip>9) {
       fHistStripCountInTime[strip] -> SetLineColor(strip-9);
       fHistStripCountInTime[strip] -> SetLineStyle(2);
+      fHistRatioCountInTime[strip] -> SetLineColor(strip-9);
+      fHistRatioCountInTime[strip] -> SetLineStyle(2);
     }
   }
 
   fHistBeamCountInTime  -> SetStats(0);
   fHistLocalCountInTime -> SetStats(0);
   fHistEventCountInTime -> SetStats(0);
-  for (int strip=1; strip<=fNumStrips; ++strip) fHistStripCountInTime[strip] -> SetStats(0);
+  for (int iStrip=0; iStrip<numChosenS1Strips; ++iStrip) {
+    auto strip = fS1ChosenS1Strips[iStrip];
+    fHistStripCountInTime[strip] -> SetStats(0);
+  }
 
   fHistEventRate      = new TH1D("histEventRateG",";event/s;count",fNumRate,0,fMaxRate);
   fHistEventRateError = new TH1D("histEventRateE","Bad event rate;event/s;count",fNumRate,0,fMaxRate);
@@ -623,20 +645,22 @@ void Analysis::InitializeDrawing()
   fHistAVSCh = new TH2D("histAVSCh", "ADC vs module-ch;;ADC", fNumCh,0,fNumCh,fNumADC,0,fMaxADC);
   fHistEVSCh = new TH2D("histEVSCh", ";;energy (MeV)", fNumCh,0,fNumCh,fNumE,0,fMaxE);
   fHistdAVSA = new TH2D("histdAVSA", "dA vs dA + S1;dA + S1A;dA", fNumADC, 0, 2*fMaxADC, fNumADC, 0, fMaxADC);
-  fHistdEVSE = new TH2D("histdEVSE", ";energy (MeV);dE (MeV)", fNumEE,0,fMaxEE, fNumdE, 0, fMaxdE);
+  //fHistdEVSE = new TH2D("histdEVSE", ";energy sum (MeV);dE (MeV)", fNumEE,0,fMaxEE, fNumdE, 0, fMaxdE);
+  fHistdEVSE = new TH2D("histdEVSE", ";energy sum (MeV);dE (MeV)", 200,0,fMaxEE, 200, 0, fMaxdE);
   fHistAVSCh -> SetStats(0);
   fHistEVSCh -> SetStats(0);
   fHistdAVSA -> SetStats(0);
-  fHistdEVSE -> SetStats(0);
+  //fHistdEVSE -> SetStats(0);
   //fHistEVSStrip = new TH2D("histEVSStrip", ";S1 strip;energy (MeV);", fNumEE,0,fMaxEE,fNumStrips+1,0,fMaxStrips);
   //fHistEVSStrip -> SetStats(0);
 
   fHistEVSS1Strip = new TH2D("histEVSS1Strip",";S1 strip;energy (MeV)",fNumStrips+1,0,fNumStrips,fNumEE,0,fMaxEE);
   fHistEVSS3Strip = new TH2D("histEVSS3Strip",";S3 strip;energy (MeV)",fNumStrips+1,0,fNumStrips,fNumEE,0,fMaxEE);
-  fHistEVSAngle   = new TH2D("histEVSAngle"  ,";angle (deg);energy",40,20,40,fNumEE,0,fMaxEE);
+  //fHistEVSAngle   = new TH2D("histEVSAngle"  ,".;angle (deg);energy",40,20,40,fNumEE,0,fMaxEE);
+  fHistEVSAngle   = new TH2D("histEVSAngle"  ,".;angle (deg);energy",180,0,180,fNumEE,0,fMaxEE);
   fHistEVSS1Strip -> SetStats(0);
   fHistEVSS3Strip -> SetStats(0);
-  fHistEVSAngle   -> SetStats(0);
+  //fHistEVSAngle   -> SetStats(0);
 
   fHistEx = new TH1D("histEx",";Cr excitation energy;count",fNumEx,0,fMaxEx);
   fHistEx -> SetFillColor(29);
@@ -663,8 +687,13 @@ void Analysis::InitializeDrawing()
     SetAttribute(fHistBeamCountInTime,  fVPadBeamCountInTime,4);
     SetAttribute(fHistEventCountInTime, fVPadEventCountInTime,4);
     SetAttribute(fHistLocalCountInTime, fVPadLocalCountInTime,4);
-    for (int strip=0; strip<=fNumStrips; ++strip)
-      SetAttribute(fHistStripCountInTime[strip], fVPadStripCountInTime,4);
+    SetAttribute(fHistStripCountInTime[0], fVPadStripCountInTime, 4);
+    SetAttribute(fHistRatioCountInTime[0], fVPadRatioCountInTime, 4);
+    for (int iStrip=0; iStrip<numChosenS1Strips; ++iStrip) {
+      auto strip = fS1ChosenS1Strips[iStrip];
+      SetAttribute(fHistStripCountInTime[strip], fVPadStripCountInTime, 4);
+      SetAttribute(fHistRatioCountInTime[strip], fVPadRatioCountInTime, 4);
+    }
   }
 
   //auto TakeCareOfLabels = [this](TH1* hist)
@@ -714,7 +743,7 @@ void Analysis::SetAttribute(TH1* hist, TVirtualPad* pad, int npad, bool is2D)
     if (pad!=nullptr) {
       pad -> SetLeftMargin(0.12);
       pad -> SetRightMargin(0.05);
-      pad -> SetBottomMargin(0.12);
+      pad -> SetBottomMargin(0.15);
       pad -> SetTopMargin(0.12);
     }
     gStyle -> SetTitleH(0.08);
@@ -869,18 +898,17 @@ void Analysis::ReadDataFile()
         else { fHistTSDist2 -> Fill(dts); }
       }
 
-      //eventStatus = kNextEvent;
+      fMinuiteBin = timeStamp*fSecondPerTS/60.;
+
+      if (FENumber==8) {
+        fCountBeam++;
+        fHistBeamCountInTime -> Fill(fMinuiteBin);
+        continue;
+      }
+
       if (timeStamp<fTimeStampPrev) eventStatus = kTSError;
       else if (timeStamp-fTimeStampPrev<=fCoincidenceTSRange) eventStatus = kSameEvent;
       else eventStatus = kNextEvent;
-
-      //coutd <<countLines<< " " << FENumber<<" "<<mch<<" "<<adc<<" "<<tsLocal<<" "<<tsGroup << endl;
-      //coutd << timeStamp << " " << fTimeStampPrev << endl;
-      //if (eventStatus==kSameEvent) coutd << "same event" << endl;
-      //if (eventStatus==kNextEvent) coutd << "next event" << endl;
-      //if (eventStatus==kTSError) coutd << "ts error" << endl;
-
-      fMinuiteBin = timeStamp*fSecondPerTS/60.;
 
       int timeStatus = kSameSecond;
       double dSecond = (timeStamp-fTimeStampLastSec)*fSecondPerTS;
@@ -1019,14 +1047,6 @@ void Analysis::ReadDataFile()
       if      (fFiredDetector[det]>= 0) fFiredDetector[det] = -2;
       else if (fFiredDetector[det]==-1) fFiredDetector[det] = dataIndex;
       fFiredDCh[det][dch] = dataIndex;
-      {
-        if (det==kS1J) fHistEVSS1Strip -> Fill(fMapS1ChToStrip[dch],energy);
-        if (det==kS3J) fHistEVSS3Strip -> Fill(fMapS3ChToStrip[dch],energy);
-        //if (det==kS1J) fHistEVSAngle -> Fill(fMapS1ChToAngle[dch],energy);
-        //if (det==kS3J) fHistEVSAngle -> Fill(fMapS3ChToAngle[dch],energy);
-        if (det==kS1J) fHistEVSAngle -> Fill(gRandom->Uniform(fMapS1ChToAngle1[dch],fMapS1ChToAngle2[dch]),energy);
-        if (det==kS3J) fHistEVSAngle -> Fill(gRandom->Uniform(fMapS3ChToAngle1[dch],fMapS3ChToAngle2[dch]),energy);
-      }
 
       if (fdES1CoincidenceMode || fdES1S3CoincidenceMode)
       {
@@ -1284,8 +1304,8 @@ bool Analysis::FillDataTree()
 
   /////////////////////////////////////////////////////////////////////////
   // check coincidence cut
-  if (fdES1CoincidenceMode) {
-
+  if (fdES1CoincidenceMode)
+  {
     //if (fCountChannels>=2) coute << fFiredDetector[kdE] << " " << fFiredDetector[kS1J] <<  endl;
 
     if (fFiredDetector[kdE]>=0 && fFiredDetector[kS1J]>=0)
@@ -1333,12 +1353,21 @@ bool Analysis::FillDataTree()
     groupS1 = fMapDetectorGroup[chS1->midx][chS1->mch];
     bdE = chdE->energy;
     bESum = chdE->energy + chS1->energy;
+    //coutd << bdE << " " << bESum << endl;
     if (groupdE==groupS1)
     {
       fHistdAVSA -> Fill(chdE->adc, chdE->adc+chS1->adc);
-      fHistdEVSE -> Fill(bdE, bESum);
+      fHistdEVSE -> Fill(bESum,bdE);
       //auto strip = fMapS1ChToStrip[chS1->dch];
       //fHistEVSStrip -> Fill(bESum,strip);
+
+      //fHistEVSS1Strip -> Fill(fMapS1ChToStrip[chdE->dch],bdE);
+      //if (det==kS3J) fHistEVSS3Strip -> Fill(fMapS3ChToStrip[dch],energy);
+      //if (fExcludeDESECutG->Inside(bESum,bdE)==false)
+      //{
+        //if (det==kS1J) fHistEVSAngle -> Fill(gRandom->Uniform(fMapS1ChToAngle1[dch],fMapS1ChToAngle2[dch]),energy);
+        //if (det==kS3J) fHistEVSAngle -> Fill(gRandom->Uniform(fMapS3ChToAngle1[dch],fMapS3ChToAngle2[dch]),energy);
+      //}
 
       //if (fS3ArrayIdx.size()==1)
       if (fFiredDetector[kS3J]>=0)
@@ -1366,6 +1395,23 @@ bool Analysis::FillDataTree()
     else {
       badEventType = 4;
       fGoodCoincidenceEvent = false;
+    }
+  }
+  //if (fExcludedES1Coincidence)
+  else
+  {
+    for (auto iChannel=0; iChannel<fChannelArray->GetEntries(); ++iChannel)
+    {
+      auto ch = (ChannelData*) fChannelArray -> At(iChannel);
+      if (ch->det==kS1J)
+      {
+        fHistEVSS1Strip -> Fill(fMapS1ChToStrip[ch->dch],ch->energy);
+        fHistEVSAngle -> Fill(gRandom->Uniform(fMapS1ChToAngle1[ch->dch],fMapS1ChToAngle2[ch->dch]),ch->energy);
+      }
+      if (ch->det==kS3J)
+      {
+        fHistEVSAngle -> Fill(gRandom->Uniform(fMapS3ChToAngle1[ch->dch],fMapS3ChToAngle2[ch->dch]),ch->energy);
+      }
     }
   }
   /////////////////////////////////////////////////////////////////////////
@@ -1428,7 +1474,7 @@ void Analysis::FillLocalHistograms()
   }
   else if (fEnergyRange1>0)
   {
-  for (auto iChannel=0; iChannel<fChannelArray->GetEntries(); ++iChannel)
+    for (auto iChannel=0; iChannel<fChannelArray->GetEntries(); ++iChannel)
     {
       auto ch = (ChannelData*) fChannelArray -> At(iChannel);
       if (ch->energy>=fEnergyRange1 && ch->energy<=fEnergyRange2) {
@@ -1444,10 +1490,18 @@ void Analysis::FillLocalHistograms()
   for (auto iChannel=0; iChannel<fChannelArray->GetEntries(); ++iChannel)
   {
     auto ch = (ChannelData*) fChannelArray -> At(iChannel);
-    if (ch->det==kS1J) {
+    if (ch->det==kS1J)
+    {
       auto strip = fMapS1ChToStrip[ch->dch];
-      if (fEnergyRange1>0 && ch->energy>=fEnergyRange1 && ch->energy<=fEnergyRange2)
-        fHistStripCountInTime[strip] -> Fill(fMinuiteBin);
+      if (fEnergyCutG!=nullptr)
+        if (fEnergyCutG->IsInside(fMapS1ChToAngle[ch->dch],ch->energy)==true) {
+          if (fHistStripCountInTime[strip]!=nullptr)
+            fHistStripCountInTime[strip] -> Fill(fMinuiteBin);
+        }
+      else
+        if (fEnergyRange1>0 && ch->energy>=fEnergyRange1 && ch->energy<=fEnergyRange2)
+          if (fHistStripCountInTime[strip]!=nullptr)
+            fHistStripCountInTime[strip] -> Fill(fMinuiteBin);
     }
   }
 }
@@ -1606,7 +1660,7 @@ bool Analysis::AskUpdateDrawing(TString message)
   return true;
 }
 
-void Analysis::UpdateCvsOnline(bool firstDraw)
+void Analysis::UpdateCvsOnline(bool firstDraw, bool write)
 {
   if (fUpdateDrawingEveryNEvent<=0)
     return;
@@ -1645,12 +1699,6 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
   if (fVPadTriggerRate==fVPadEventRate)
   {
     fVPadTriggerRate -> cd();
-    //double maxTrigger = fHistTriggerRate->GetBinContent(fHistTriggerRate->GetMaximumBin());
-    //double maxEvent = fHistEventRate->GetBinContent(fHistEventRate->GetMaximumBin());
-    //if (maxTrigger<maxEvent)
-    //  fHistTriggerRate -> SetMaximum(maxTrigger*1.05);
-    //else
-    //  fHistEventRate -> SetMaximum(maxEvent*1.05);
 
     fHistEventRate -> Draw();
     fHistTriggerRate -> Draw("same");
@@ -1666,56 +1714,98 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
     fHistEventRateError -> Draw("same");
   }
 
-  double minuiteBinMax = fMinuiteBin+3;
-  if      (minuiteBinMax<8) minuiteBinMax = 10;
-  else if (minuiteBinMax<18) minuiteBinMax = 25;
-  else if (minuiteBinMax<30) minuiteBinMax = 50;
-  else if (minuiteBinMax<70) minuiteBinMax = 100;
-  else if (minuiteBinMax<110) minuiteBinMax = 150;
-  else if (minuiteBinMax<150) minuiteBinMax = 200;
-  else if (minuiteBinMax<220) minuiteBinMax = 300;
+  double minuiteBinMax = fMinuiteBin*1.3;
+  //if      (minuiteBinMax>220) minuiteBinMax = 300;
+  //else if (minuiteBinMax>150) minuiteBinMax = 200;
+  //else if (minuiteBinMax>110) minuiteBinMax = 150;
+  //else if (minuiteBinMax>70) minuiteBinMax = 100;
+  //else if (minuiteBinMax>30) minuiteBinMax = 50;
+  //else if (minuiteBinMax>18) minuiteBinMax = 25;
+  //if      (minuiteBinMax>8) minuiteBinMax = 10;
+  if (fVPadBeamCountInTime!=nullptr) {
   fVPadBeamCountInTime -> cd();
   fHistBeamCountInTime -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
   fHistBeamCountInTime -> Draw();
-  fVPadEventCountInTime -> cd();
-  fHistEventCountInTime -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
-  fHistEventCountInTime -> Draw();
+  }
+  if (fVPadEventCountInTime!=nullptr) {
+    fVPadEventCountInTime -> cd();
+    fHistEventCountInTime -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
+    fHistEventCountInTime -> Draw();
+  }
+  if (fVPadLocalCountInTime!=nullptr) {
   fVPadLocalCountInTime -> cd();
   fHistLocalCountInTime -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
   fHistLocalCountInTime -> Draw();
-  fVPadStripCountInTime -> cd();
+  }
 
-  double yMaxStrip = 0;
-  for (int strip=1; strip<=fNumStrips; ++strip) {
-    auto hist = fHistStripCountInTime[strip];
-    auto max = hist -> GetBinContent(hist -> GetMaximumBin());
-    if (max>yMaxStrip)
-      yMaxStrip = max;
-  }
-  fHistStripCountInTime[0] -> SetMaximum(yMaxStrip*1.2);
-  fHistStripCountInTime[0] -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
-  fHistStripCountInTime[0] -> Draw();
-  auto legend = new TLegend(0.8,0.15,0.95,0.85);
-  legend -> SetBorderSize(0);
-  legend -> SetFillStyle(0);
-  //legend -> SetTextSize(0.05);
-  legend -> AddEntry("","strip","");
-  int nn = fS1ChosenS1Strips.size();
-  if (nn==0)
+  int numChosenS1Strips = fS1ChosenS1Strips.size();
+  if (fVPadStripCountInTime!=nullptr)
   {
-    for (int strip=1; strip<=fNumStrips; ++strip) {
-      fHistStripCountInTime[strip] -> Draw("same");
-      legend -> AddEntry(fHistStripCountInTime[strip],Form("%d",strip),"l");
+    fVPadStripCountInTime -> cd();
+    double yMaxStrip = 0;
+    for (int iStrip=0; iStrip<numChosenS1Strips; ++iStrip) {
+      auto strip = fS1ChosenS1Strips[iStrip];
+      auto hist = fHistStripCountInTime[strip];
+      auto max = hist -> GetBinContent(hist -> GetMaximumBin());
+      if (max>yMaxStrip)
+        yMaxStrip = max;
     }
-  }
-  else {
-    for (int iStrip=0; iStrip<nn; ++iStrip) {
+    fHistStripCountInTime[0] -> SetMaximum(yMaxStrip*1.2);
+    fHistStripCountInTime[0] -> Draw();
+    fHistStripCountInTime[0] -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
+    auto legend = new TLegend(0.86,0.15,0.95,0.85);
+    legend -> SetBorderSize(0);
+    legend -> SetFillStyle(0);
+    legend -> AddEntry("","strip","");
+    for (int iStrip=0; iStrip<numChosenS1Strips; ++iStrip) {
       auto strip = fS1ChosenS1Strips[iStrip];
       fHistStripCountInTime[strip] -> Draw("same");
       legend -> AddEntry(fHistStripCountInTime[strip] ,Form("%d",strip),"l");
     }
+    legend -> Draw("same");
+    fHistStripCountInTime[0] -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
   }
-  legend -> Draw("same");
+
+  if (fVPadRatioCountInTime!=nullptr)
+  {
+    for (int iStrip=0; iStrip<numChosenS1Strips; ++iStrip) {
+      auto strip = fS1ChosenS1Strips[iStrip];
+      auto histStrip = fHistStripCountInTime[strip];
+      auto histRatio = fHistRatioCountInTime[strip];
+      for (auto timeBin=1; timeBin<=fMaxTime; ++timeBin)
+      {
+        double value1 = histStrip -> GetBinContent(timeBin);
+        double value2 = fHistBeamCountInTime -> GetBinContent(timeBin);
+        double ratio = value1 / value2;
+        if (value1==0 || value2==0)
+          continue;
+        histRatio -> SetBinContent(timeBin,ratio);
+      }
+    }
+    fVPadRatioCountInTime -> cd();
+    double yMaxRatio = 0;
+    for (int iStrip=0; iStrip<numChosenS1Strips; ++iStrip) {
+      auto strip = fS1ChosenS1Strips[iStrip];
+      auto hist = fHistRatioCountInTime[strip];
+      auto max = hist -> GetBinContent(hist -> GetMaximumBin());
+      if (max>yMaxRatio)
+        yMaxRatio = max;
+    }
+    fHistRatioCountInTime[0] -> SetMaximum(yMaxRatio*1.2);
+    fHistRatioCountInTime[0] -> Draw();
+    fHistRatioCountInTime[0] -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
+    auto legend = new TLegend(0.86,0.15,0.95,0.85);
+    legend -> SetBorderSize(0);
+    legend -> SetFillStyle(0);
+    legend -> AddEntry("","strip","");
+    for (int iStrip=0; iStrip<numChosenS1Strips; ++iStrip) {
+      auto strip = fS1ChosenS1Strips[iStrip];
+      fHistRatioCountInTime[strip] -> Draw("same");
+      legend -> AddEntry(fHistRatioCountInTime[strip] ,Form("%d",strip),"l");
+    }
+    legend -> Draw("same");
+    fHistRatioCountInTime[0] -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
+  }
 
   fVPadTSDist1 -> cd();
   fHistTSDist1 -> Draw();
@@ -1775,6 +1865,7 @@ void Analysis::UpdateCvsOnline(bool firstDraw)
 
   fCvsOnline -> Modified();
   fCvsOnline -> Update();
+  fHistStripCountInTime[0] -> GetXaxis() -> SetRangeUser(0,minuiteBinMax);
 }
 
 bool Analysis::CheckStopFile()
@@ -1810,6 +1901,9 @@ void Analysis::EndOfConversion()
   fHistAVSCh -> Write();
   fHistEVSCh -> Write();
 
+  fHistdEVSE -> Write();
+  fHistEVSAngle -> Write();
+
   PrintConversionSummary();
 
   couti << "End of conversion!" << endl;
@@ -1824,6 +1918,7 @@ void Analysis::PrintConversionSummary()
   cout << endl;
   couti << "Number of events: " << fCountEvents << endl;
   couti << "Number of channels: " << fCountAllChannels << " (from " << fCountAllLines << ")" << endl;
+  couti << "Number of beam data: " << fCountBeam << endl;
   couti << "Number of times TS-error occured: " << fCountTSError << endl;
   couti << "Number of events with 0   coincidence channels: " << fCoincidenceCount[0] << endl;
   couti << "Number of events with 1   coincidence channels: " << fCoincidenceCount[1] << endl;
@@ -1882,19 +1977,100 @@ void Analysis::MakeCutGFile(int pdt)
 {
   TString name;
   if      (pdt==1) name = "cutGProton";
-  else if (pdt==2) name = "cutGTriton";
-  else if (pdt==3) name = "cutGDeuteron";
+  else if (pdt==2) name = "cutGDeuteron";
+  else if (pdt==3) name = "cutGTriton";
+  else if (pdt> 3) name = Form("cutG%d",pdt);
   TString fileName = getAna()->GetOutputPath() + name + ".root";
   //if (getAna()->fRunNo>0) fileName = getAna()->GetOutputPath() + Form("RUN%03d.") + name + ".root";
   cout << "Creating " << fileName << endl;
   auto file = new TFile(fileName,"recreate");
   TCutG* cutG = (TCutG*) gROOT->GetListOfSpecials()->FindObject("CUTG");
-  cutG -> SetName(name);
+  cutG -> SetName("cutg");
   file -> cd();
   cutG -> SetVarX("de");
   cutG -> SetVarY("ee");
   cutG -> Write();
 }
+
+void Analysis::SetExcludeDESECutGFile(TString fileName)
+{
+  couti << "Set graphic cut from " << fileName << endl;
+
+  TDirectory* currentDirectory;
+  if (gDirectory!=nullptr)
+    currentDirectory = gDirectory;
+  TFile* file = new TFile(fileName,"read");
+  if (file->IsOpen())
+  {
+    TCutG* cutG = (TCutG*) file -> Get("cutg");
+    cutG -> SetVarX("de");
+    cutG -> SetVarY("ee");
+    if (currentDirectory!=nullptr)
+      currentDirectory -> cd();
+    fExcludeDESECutG = cutG;
+  }
+  else
+    coute << fileName << " null" << endl;
+}
+
+void Analysis::SetEnergyCutGFile(TString fileName)
+{
+  couti << "Set graphic cut from " << fileName << endl;
+
+  TDirectory* currentDirectory;
+  if (gDirectory!=nullptr)
+    currentDirectory = gDirectory;
+  TFile* file = new TFile(fileName,"read");
+  if (file->IsOpen())
+  {
+    TCutG* cutG = (TCutG*) file -> Get("cutg");
+    cutG -> SetVarX("de");
+    cutG -> SetVarY("ee");
+    if (currentDirectory!=nullptr)
+      currentDirectory -> cd();
+    fEnergyCutG = cutG;
+  }
+  else
+    coute << fileName << " null" << endl;
+}
+
+/*
+void Analysis::GetCutGFile(int pdt)
+{
+  TString name;
+  if (pdt==0) {
+    GetCutGFile(1);
+    GetCutGFile(2);
+    GetCutGFile(3);
+    return;
+  }
+  if      (pdt==1) name = "cutGProton";
+  else if (pdt==2) name = "cutGTriton";
+  else if (pdt==3) name = "cutGDeuteron";
+  else if (pdt> 3) name = Form("cutG%d",pdt);
+  TString fileName = getAna()->GetOutputPath() + name + ".root";
+  couti << "Set graphic cut from " << fileName << " >> " << name << endl;
+
+  TDirectory* currentDirectory;
+  if (gDirectory!=nullptr)
+    currentDirectory = gDirectory;
+  TFile* file = new TFile(fileName,"read");
+  if (file->IsOpen())
+  {
+    TCutG* cutG = (TCutG*) file -> Get("cutg");
+    cutG -> SetVarX("de");
+    cutG -> SetVarY("ee");
+    if (currentDirectory!=nullptr)
+      currentDirectory -> cd();
+    if      (pdt==1) fProtonCutG = cutG;
+    else if (pdt==2) fDeuteronCutG = cutG;
+    else if (pdt==3) fTritonCutG = cutG;
+    else if (pdt==4) fExcludeDESECutG = cutG;
+  }
+  else
+    coute << fileName << " null" << endl;
+}
+*/
 
 void Analysis::CallCutGFile(int pdt)
 {
