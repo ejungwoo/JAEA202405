@@ -129,7 +129,7 @@ void draw_pid(int runNo=528)
     cvs -> Divide(2,1);
     cvs -> cd(1); histdECount -> Draw(""); DrawHistBar(histdECount);
     cvs -> cd(2); histS1Count -> Draw(""); DrawHistBar(histS1Count);
-    cvs -> SaveAs("figure/figure_channel_count.png");
+    cvs -> SaveAs("figures/figure_channel_count.png");
 
     auto cvs_de = new TCanvas("cvs_de","",1200,1000);
     cvs_de -> cd(1); histPID[selectdE] -> Draw("colz");
@@ -140,7 +140,7 @@ void draw_pid(int runNo=528)
         pid_cut[selectdE][4] -> Draw("samel");
         pid_cut[selectdE][5] -> Draw("samel");
     }
-    cvs_de -> SaveAs(Form("figure/figure_dE%d_pid.png",selectdE));
+    cvs_de -> SaveAs(Form("figures/figure_dE%d_pid.png",selectdE));
 
     auto cvs_ea = new TCanvas("cvs_ea","",1800,1000);
     cvs_ea -> Divide(3,2);
@@ -150,7 +150,7 @@ void draw_pid(int runNo=528)
     cvs_ea -> cd(4); histEVSAngle[3] -> Draw("colz");
     cvs_ea -> cd(5); histEVSAngle[4] -> Draw("colz");
     cvs_ea -> cd(6); histEVSAngle[5] -> Draw("colz");
-    cvs_ea -> SaveAs(Form("figure/figure_dE%d_E_vs_Angle.png",selectdE));
+    cvs_ea -> SaveAs(Form("figures/figure_dE%d_E_vs_Angle.png",selectdE));
 
     TString outputFileName = Form("out/RUN%d.analysis.root",runNo);
     auto file_out = new TFile(outputFileName,"recreate");
