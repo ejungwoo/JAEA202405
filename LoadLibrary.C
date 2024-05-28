@@ -1,38 +1,30 @@
-bool LoadLibrary(bool updateSource=true)
+bool CompileAndLoad(const char* name, bool recompile, bool ismacro=false);
+
+bool LoadLibrary(bool recompile=true)
 {
-  // option: "k" to keep the shared library, "-" to build directly to "build"
-  if (updateSource)
-  {
     gSystem -> SetFlagsOpt("-std=c++11");
-    if (gSystem -> CompileMacro("ChannelData.cpp","k-","","build")==false) {
-      cout << "Failed to create library for ChannelData!" << endl;
-      return false;
-    }
-    if (gSystem -> Load("/home/daquser/data/LiCD2Irrad/SortSi/build/ChannelData_cpp.so")<0) {
-      cout << "Failed to load library for ChannelData!" << endl;
-      return false;
-    }
-    if (gSystem -> CompileMacro("Analysis.cpp","k-","","build")==false) {
-      cout << "Failed to create library for Analysis!" << endl;
-      return false;
-    }
-    if (gSystem -> Load("/home/daquser/data/LiCD2Irrad/SortSi/build/Analysis_cpp.so")<0) {
-      cout << "Failed to load library for Analysis!" << endl;
-      return false;
-    }
-  }
-  else {
-    if (gSystem -> Load("/home/daquser/data/LiCD2Irrad/SortSi/build/ChannelData_cpp.so")<0) {
-      cout << "Failed to load library for ChannelData!" << endl;
-      return false;
-    }
-    if (gSystem -> Load("/home/daquser/data/LiCD2Irrad/SortSi/build/Analysis_cpp.so")<0) {
-      cout << "Failed to load library for Analysis!" << endl;
-      return false;
-    }
-  }
+    CompileAndLoad("DetectorSetting", recompile);
+    CompileAndLoad("ChannelData", recompile);
+    CompileAndLoad("Analysis", recompile);
+    //CompileAndLoad("draw_des1", recompile, true);
 
-  //gSystem -> Load("run_conversion.C");
-
-  return true;
+    return true;
 }
+
+bool CompileAndLoad(const char* name, bool recompile, bool ismacro)
+{
+    // option "k" keep the shared library, option "-" build lib directly to "build"
+    TString pathToBuild = "/home/daquser/data/LiCD2Irrad/SortSi/build/";
+    if (recompile) {
+        if (gSystem -> CompileMacro(Form("%s.%s",name,(ismacro?"C":"cpp")),"k-","","build")==false) {
+            cout << "!! Failed to create library for " << name << endl;
+            return false;
+        }
+    }
+    if (gSystem -> Load(pathToBuild+Form("%s_%s.so",name,(ismacro?"C":"cpp")))<0) {
+        cout << "!! Failed to load library for " << name << endl;
+        return false;
+    }
+    return true;
+}
+
