@@ -5,15 +5,17 @@
 #include "TCanvas.h"
 #include "TClonesArray.h"
 #include "TApplication.h"
-#include "ChannelData.h"
 #include <iostream>
 #include <vector>
-#include "DetectorSetting.h"
 using namespace std;
 
-void draw_pid(int runNo=528)
+#include "jshort.h"
+
+void run_draw_pid(int runNo=528)
 {
     int selectdE = 7;
+
+    DetectorSetting* ds = DetectorSetting::GetDetectorSetting();
 
     bool pid_is_set = false;
     TCutG* pid_cut[17][8];
@@ -94,8 +96,8 @@ void draw_pid(int runNo=528)
             if (foundS1>0 && founddE>0)
             {
                 histPID[founddE] -> Fill(ee,de);
-                double angle1 = getDet()->S1Ch_Angle1(foundS1);
-                double angle2 = getDet()->S1Ch_Angle2(foundS1);
+                double angle1 = ds->S1Ch_Angle1(foundS1);
+                double angle2 = ds->S1Ch_Angle2(foundS1);
                 histEVSAngle[0] -> Fill(gRandom->Uniform(angle1,angle2),ee);
                 if (pid_is_set) {
                     if (pid_cut[selectdE][1]->IsInside(ee,de)) histEVSAngle[1] -> Fill(gRandom->Uniform(angle1,angle2),ee);

@@ -1,6 +1,6 @@
 #include "DetectorSetting.h"
 
-DetectorSetting *getDet() { return DetectorSetting::GetDetectorSetting(); }
+ClassImp(DetectorSetting)
 
 DetectorSetting* DetectorSetting::fInstance = nullptr;
 DetectorSetting* DetectorSetting::GetDetectorSetting() {

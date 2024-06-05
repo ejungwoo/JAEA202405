@@ -1,4 +1,6 @@
-void run_conversion(int runNo=528, double energy=-1)
+#include "jshort.h"
+
+void run_conversion(int runNo=515, double energy=-1)
 {
     //if (runNo<0 && gApplication->Argc()>=5 && TString(gApplication->Argv()[4]).IsDec())
     //    runNo = TString(gApplication->Argv()[4]).Atoi();
@@ -33,7 +35,8 @@ void run_conversion(int runNo=528, double energy=-1)
     ana -> SetCoincidenceTSRange(4);
     //ana -> SetTritonCutFile("out/tritonCutG.root");
     //ana -> SetCoincidenceMultRange(2,3);
-    ana -> SetdES1Coincidence(true);
+    if (runNo!=515 && runNo==511)
+        ana -> SetdES1Coincidence(true);
     //ana -> SetdES1S3Coincidence(true);
 
     // conditions for local histograms (which will not affect event collection)

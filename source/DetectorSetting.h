@@ -20,7 +20,9 @@ const int kFC  = 6;
 #include <iostream>
 using namespace std;
 
-class DetectorSetting
+#include "TObject.h"
+
+class DetectorSetting : public TObject
 {
     public:
         DetectorSetting();
@@ -93,14 +95,18 @@ class DetectorSetting
         int    fMapS3ChToStrip[33];
 
     private:
-        TString fMapFileName = "ModCh.in";
-        TString fDetFileName = "MapDetector.in";
+        TString fMapFileName = "source/ModCh.in";
+        TString fDetFileName = "source/MapDetector.in";
 
     public:
         static DetectorSetting* GetDetectorSetting();
 
     private:
         static DetectorSetting* fInstance;
+
+    ClassDef(DetectorSetting,1)
 };
+
+//DetectorSetting *getDet() { return DetectorSetting::GetDetectorSetting(); }
 
 #endif

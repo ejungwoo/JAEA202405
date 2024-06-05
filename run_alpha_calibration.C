@@ -1,4 +1,6 @@
-void calibrate_alpha(int runNo=515)
+#include "jshort.h"
+
+void run_alpha_calibration(int runNo=515)
 {
   bool drawAnalysis = true;
 

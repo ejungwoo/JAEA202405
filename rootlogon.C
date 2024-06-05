@@ -1,9 +1,6 @@
-#include "LoadLibrary.C"
-
 void rootlogon()
 {
-  if (LoadLibrary(true))
-    cout << "(rootlogon) Succesfully loaded library for JAEA Tandem Experiment Analysis" << endl;
-  else
-    cout << "(rootlogon) Error in LoadLibrary" << endl;
+    int load = gSystem -> Load("build/libJAEAExp.so");
+    if (load>=0)
+        cout << "JAEAExp" << endl;
 }

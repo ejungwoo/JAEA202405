@@ -54,7 +54,9 @@ using namespace std;
 
 #include "ChannelData.cpp"
 
-class Analysis
+#include "TObject.h"
+
+class Analysis : public TObject
 {
     public:
         Analysis();
@@ -392,6 +394,8 @@ class Analysis
     private:
         static Analysis* fInstance;
         std::ofstream coutx;
+
+    ClassDef(Analysis,1)
 };
 
 #endif

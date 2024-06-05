@@ -12,17 +12,7 @@
 
 //#define DEBUG_EVENT_LINE_CONDITION
 
-//////////////////////////////////////////////////////////////////////////////
-void setRun(int runNo) { Analysis::GetAnalysis()->SetRunNo(runNo); }
-Analysis *getAna() { return Analysis::GetAnalysis(); }
-void makeCutG(TString name) { Analysis::MakeCutGFile(name); }
-void makeCutG(int pdt) { Analysis::MakeCutGFile(pdt); }
-void callCuts() {
-    Analysis::CallCutGFile(1);
-    Analysis::CallCutGFile(2);
-    Analysis::CallCutGFile(3);
-}
-//////////////////////////////////////////////////////////////////////////////
+ClassImp(Analysis)
 
 Analysis* Analysis::fInstance = nullptr;
 Analysis* Analysis::GetAnalysis() {
@@ -1761,7 +1751,7 @@ double Analysis::GetCalibratedEnergy(int midx, int mch, int adc)
 void Analysis::MakeCutGFile(TString name)
 {
     if (name.IsNull()) name = "cutGAna";
-    TString fileName = getAna()->GetOutputPath() + name + ".root";
+    TString fileName = Analysis::GetAnalysis()->GetOutputPath() + name + ".root";
     cout << "Creating " << fileName << endl;
     auto file = new TFile(fileName,"recreate");
     TCutG* cutG = (TCutG*) gROOT->GetListOfSpecials()->FindObject("CUTG");
@@ -1830,7 +1820,7 @@ void Analysis::CallCutGFile(int pdt)
     if      (pdt==1) name = "cutGProton";
     else if (pdt==2) name = "cutGTriton";
     else if (pdt==3) name = "cutGDeuteron";
-    TString fileName = getAna()->GetOutputPath() + name + ".root";
+    TString fileName = Analysis::GetAnalysis()->GetOutputPath() + name + ".root";
     couti << "Set graphic cut from " << fileName << " >> " << name << endl;
 
     //TDirectory* currentDirectory;

@@ -62,7 +62,7 @@ class ChannelData : public TObject
             energy = energy_;
         }
 
-        ClassDef(ChannelData,1)
+    ClassDef(ChannelData,1)
 };
 
 #endif
