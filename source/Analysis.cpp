@@ -593,7 +593,7 @@ void Analysis::ConfigureDateTime()
     cout << endl;
     couti << Form("Looking for RUN%03d in %s",fRunNo,fPathToInput.Data()) << " ..." << endl;
 
-    auto inputDirectory = TSystemDirectory("inputDirectory",fPathToInput.Data());
+    TSystemDirectory inputDirectory("inputDirectory",fPathToInput.Data());
 
     auto listOfFiles = inputDirectory.GetListOfFiles();
     TIter next(listOfFiles);
