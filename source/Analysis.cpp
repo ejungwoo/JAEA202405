@@ -341,6 +341,9 @@ bool Analysis::AnalyzeAlphaTest(int midx, int mch, bool drawAnalysis, TVirtualPa
 
         histE -> GetXaxis() -> SetRangeUser(mean2-8*sigma2,mean1+8*sigma1);
         histE -> Draw();
+        fFitAlpha -> SetNpx(1000);
+        fFitAlpha1 -> SetNpx(1000);
+        fFitAlpha2 -> SetNpx(1000);
         fFitAlpha -> DrawCopy("samel");
         fFitAlpha1 -> DrawCopy("samel");
         fFitAlpha2 -> DrawCopy("samel");
@@ -913,7 +916,8 @@ bool Analysis::CheckOpenFileStatus2()
         couti << "File number " << fDataFileNumber << " exceeded maximum " << fFileNumberMax << endl;
         return false;
     }
-    fInputFileName = Form("%s/RUN%03d_%s_list_%03d.dat", fPathToInput.Data(),fRunNo,fDateTime.Data(),fDataFileNumber);
+    //fInputFileName = Form("%s/RUN%03d_%s_list_%03d.dat", fPathToInput.Data(),fRunNo,fDateTime.Data(),fDataFileNumber);
+    fInputFileName = Form("%s/RUN%03d_%03d.dat", fPathToInput.Data(),fRunNo,fDataFileNumber);
     //fInputFileName = Form("%s/RUN%03d_list_%03d.dat", fPathToInput.Data(),fRunNo,fDataFileNumber);
     fDataFileNumber++;
 

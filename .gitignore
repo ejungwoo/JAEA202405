@@ -3,3 +3,6 @@ out/
 test_data/
 input/
 beam/
+*.dat
+*.root
+*.ctl

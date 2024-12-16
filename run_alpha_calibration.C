@@ -1,13 +1,16 @@
 #include "jshort.h"
 
-void run_alpha_calibration(int runNo=515)
+void run_alpha_calibration(int runNo=15)
 {
   bool drawAnalysis = true;
 
-  auto ana = new Analysis();
-  ana -> ReadSummaryFile(Form("out/RUN%03d.summary.root",runNo));
+  TString path_to_output = "data_converted";
 
-  if (runNo==511) {
+  auto ana = new Analysis();
+  ana -> ReadSummaryFile(Form("%s/RUN%03d.summary.root",path_to_output.Data(),runNo));
+  ana -> SetPathToOutput("data_calibrated/");
+
+  if (runNo==11) {
     ana -> AnalyzeAlphaTestModule(1,drawAnalysis);
     ana -> AnalyzeAlphaTestModule(2,drawAnalysis);
     ana -> AnalyzeAlphaTestModule(3,drawAnalysis);
@@ -15,11 +18,11 @@ void run_alpha_calibration(int runNo=515)
     ana -> AnalyzeAlphaTestModule(5,drawAnalysis);
     ana -> AnalyzeAlphaTestModule(6,drawAnalysis);
   }
-  else if (runNo==513) {
+  else if (runNo==13) {
     ana -> SetNumADC(500);
     ana -> AnalyzeAlphaTestModule(0,drawAnalysis);
   }
-  else if (runNo<=515) {
+  else if (runNo<=15) {
     ana -> SetNumADC(500);
     ana -> AnalyzeAlphaTestModule(0,drawAnalysis);
   }
