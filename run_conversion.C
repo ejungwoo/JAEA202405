@@ -29,8 +29,8 @@ void run_conversion(int runNo=28, double energy=-1)
     //ana -> SetDrawOnline(1000000);
 
     // alpha calibration
-    ana -> AddAlphaCalibrationFile("out/RUN015.alpha.root");
-    ana -> AddAlphaCalibrationFile("out/RUN011.alpha.root");
+    ana -> AddAlphaCalibrationFile("data_calibrated/RUN015.alpha.root");
+    ana -> AddAlphaCalibrationFile("data_calibrated/RUN011.alpha.root");
     ana -> SetShowEnergyConversion(true);
 
     ana -> SetCoincidenceTSRange(4);

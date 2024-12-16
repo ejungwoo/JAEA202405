@@ -11,7 +11,7 @@ using namespace std;
 
 #include "jshort.h"
 
-void run_draw_pid(int runNo=528)
+void run_draw_pid(int runNo=28)
 {
     int selectdE = 7;
 
@@ -34,7 +34,8 @@ void run_draw_pid(int runNo=528)
         pid_cut[selectdE][5] -> SetLineColor(kOrange);
     }
 
-    TString inputFileName = Form("out/RUN%d.summary.root",runNo);
+    TString inputFileName = Form("data_converted/RUN%03d.summary.root",runNo);
+    cout << inputFileName << endl;
     TFile* file_summary = new TFile(inputFileName);
     TTree* tree = (TTree*) file_summary -> Get("event");
 
@@ -64,6 +65,7 @@ void run_draw_pid(int runNo=528)
         histEVSAngle[ipid] = new TH2D(Form("histEVSAngle_pid%d",ipid),Form("PID cut %d;angle (deg);de+s1",ipid),25,20,45,200,0,30);
 
     Long64_t numEvents = tree -> GetEntries();
+    cout << numEvents << endl;
     for (Long64_t iEvent=0; iEvent<numEvents; ++iEvent)
     {
         tree -> GetEntry(iEvent);
