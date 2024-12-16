@@ -1,6 +1,6 @@
 #include "jshort.h"
 
-void run_conversion(int runNo=22, double energy=-1)
+void run_conversion(int runNo=28, double energy=-1)
 {
     //if (runNo<0 && gApplication->Argc()>=5 && TString(gApplication->Argv()[4]).IsDec())
     //    runNo = TString(gApplication->Argv()[4]).Atoi();
