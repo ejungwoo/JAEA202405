@@ -347,6 +347,7 @@ class Analysis : public TObject
         double bdE = -1;
         double bESum = -1;
         double bE3 = -1;
+        double bE1 = -1;
 
         //const int fNumModules = NUMBER_OF_MODULES;
         //const int fNumMChannels = NUMBER_OF_CHANNELS;

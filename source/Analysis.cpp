@@ -144,6 +144,7 @@ void Analysis::ReadSummaryFile(TString fileName)
     fTreeSummary -> SetBranchAddress("nch",&bNumChannels);
     fTreeSummary -> SetBranchAddress("de",&bdE);
     fTreeSummary -> SetBranchAddress("ee",&bESum);
+    fTreeSummary -> SetBranchAddress("s1",&bE1);
     fTreeSummary -> SetBranchAddress("s3",&bE3);
     fTreeSummary -> SetBranchAddress("ch",&fChannelArray);
     fNumEventsSummary = fTreeSummary -> GetEntries();
@@ -659,6 +660,7 @@ void Analysis::SetConversionFile(TString fileName)
     fTreeOut -> Branch("nch",&bNumChannels);
     fTreeOut -> Branch("de",&bdE);
     fTreeOut -> Branch("ee",&bESum);
+    fTreeOut -> Branch("s1",&bE1);
     fTreeOut -> Branch("s3",&bE3);
     fTreeOut -> Branch("ch",&fChannelArray);
 
@@ -1126,6 +1128,7 @@ bool Analysis::FillDataTree()
     bool fillEVSAngle = !fExcludedES1Coincidence;
     bdE = -1;
     bESum = -1;
+    bE1 = -1;
     bE3 = -1;
     int groupdE = 0;
     int groupS1 = 0;
@@ -1142,6 +1145,12 @@ bool Analysis::FillDataTree()
         {
             fHistdAVSA -> Fill(chdE->adc, chdE->adc+chS1->adc);
             fHistdEVSE -> Fill(bESum,bdE);
+
+            if (fFiredDetector[kS1J]>=0)
+            {
+                auto chS1 = (ChannelData*) fChannelArray -> At(fFiredDetector[kS1J]);
+                bE1 = chS1->energy;
+            }
 
             if (fFiredDetector[kS3J]>=0)
             {
